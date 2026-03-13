@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Governance Report</title>
+<style>
+:root {
+  --bg: #fff;
+  --bg-panel: #f8f9fa;
+  --bg-hover: #e9ecef;
+  --bg-selected: #dee2e6;
+  --text: #212529;
+  --text-muted: #6c757d;
+  --border: #dee2e6;
+  --red: #dc3545;
+  --amber: #fd7e14;
+  --green: #198754;
+  --blue: #0d6efd;
+  --badge-bg: #e9ecef;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1a1a2e;
+    --bg-panel: #16213e;
+    --bg-hover: #1a2744;
+    --bg-selected: #1f3050;
+    --text: #e0e0e0;
+    --text-muted: #8899aa;
+    --border: #2a3a4a;
+    --red: #ff6b6b;
+    --amber: #ffa94d;
+    --green: #51cf66;
+    --blue: #74c0fc;
+    --badge-bg: #2a3a4a;
+  }
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace; font-size: 13px; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; }
+.header { padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--bg-panel); display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.header .stat { display: flex; align-items: center; gap: 4px; }
+.header .stat-label { color: var(--text-muted); }
+.header .stat-value { font-weight: 600; }
+.header .stat-value.has-violations { color: var(--red); }
+.main { display: flex; flex: 1; overflow: hidden; }
+.left-panel { width: 40%; border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+.right-panel { width: 60%; overflow-y: auto; padding: 16px; font-size: 14px; }
+.sort-bar { padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--bg-panel); display: flex; gap: 8px; align-items: center; }
+.sort-bar span { color: var(--text-muted); font-size: 12px; }
+.sort-btn { background: none; border: 1px solid var(--border); color: var(--text); padding: 2px 8px; border-radius: 3px; cursor: pointer; font-size: 11px; font-family: inherit; }
+.sort-btn.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+.tree { flex: 1; overflow-y: auto; padding: 4px 0; }
+.mod-row { padding: 6px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid transparent; }
+.mod-row:hover { background: var(--bg-hover); }
+.mod-row.selected { background: var(--bg-selected); }
+.mod-row .arrow { width: 16px; text-align: center; color: var(--text-muted); font-size: 11px; flex-shrink: 0; }
+.mod-row .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mod-row .sym-count { color: var(--text-muted); font-size: 11px; }
+.badge { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 10px; font-weight: 600; background: var(--badge-bg); }
+.badge.good { color: var(--green); }
+.badge.warn { color: var(--amber); }
+.badge.bad { color: var(--red); }
+.violation-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); flex-shrink: 0; }
+.file-list { padding: 2px 0 4px 36px; }
+.file-entry { padding: 2px 12px; color: var(--text-muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-entry .target-link { color: var(--blue); cursor: pointer; text-decoration: underline; }
+.detail-section { margin-bottom: 20px; }
+.detail-section h3 { font-size: 14px; margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+.detail-title { font-size: 18px; font-weight: 700; margin-bottom: 12px; }
+.metrics-group { margin-bottom: 16px; }
+.metrics-group-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+.metric-card { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 4px; padding: 8px 10px; }
+.metric-card .label { font-size: 11px; color: var(--text-muted); }
+.metric-card .value { font-size: 16px; font-weight: 700; }
+.metric-card .formula { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.dep-item { padding: 4px 0; }
+.dep-header { cursor: pointer; display: flex; align-items: center; gap: 6px; }
+.dep-header:hover { color: var(--blue); }
+.dep-header .dep-arrow { font-size: 10px; color: var(--text-muted); width: 12px; }
+.dep-header .dep-count { color: var(--text-muted); font-size: 12px; }
+.dep-header .dep-name { color: var(--blue); cursor: pointer; }
+.dep-header .dep-name:hover { text-decoration: underline; }
+.dep-files { padding-left: 18px; font-size: 12px; color: var(--text-muted); }
+.dep-files div { padding: 1px 0; }
+.violation-item { padding: 6px 8px; margin-bottom: 4px; border-left: 3px solid var(--red); background: var(--bg-panel); border-radius: 0 4px 4px 0; }
+.violation-item.warning { border-left-color: var(--amber); }
+.violation-item .v-rule { font-weight: 600; font-size: 12px; }
+.violation-item .v-detail { margin-top: 2px; }
+.violation-item .v-evidence { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.empty-state { color: var(--text-muted); font-style: italic; }
+.upload-overlay { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 16px; }
+.upload-overlay h2 { font-size: 18px; font-weight: 600; }
+.upload-overlay p { color: var(--text-muted); }
+.upload-zone { border: 2px dashed var(--border); border-radius: 8px; padding: 40px 60px; text-align: center; cursor: pointer; transition: border-color .2s; }
+.upload-zone:hover, .upload-zone.dragover { border-color: var(--blue); }
+.upload-zone input { display: none; }
+.placeholder { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); font-size: 14px; }
+.tab-bar { display: flex; gap: 0; border-bottom: 1px solid var(--border); background: var(--bg-panel); }
+.tab-btn { background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-muted); padding: 8px 20px; cursor: pointer; font-size: 13px; font-family: inherit; font-weight: 600; }
+.tab-btn:hover { color: var(--text); background: var(--bg-hover); }
+.tab-btn.active { color: var(--blue); border-bottom-color: var(--blue); }
+.matrix-container { flex: 1; overflow: auto; padding: 16px; }
+.matrix table { border-collapse: collapse; font-family: inherit; }
+.matrix th, .matrix td { width: 50px; min-width: 50px; height: 32px; text-align: center; font-size: 12px; border: 1px solid var(--border); padding: 2px 4px; }
+.matrix th { background: var(--bg-panel); font-weight: 600; white-space: nowrap; }
+.matrix th.col-header { height: auto; padding: 0; }
+.matrix th.col-header div { writing-mode: vertical-lr; transform: rotate(180deg); padding: 8px 4px; font-size: 11px; white-space: nowrap; }
+.matrix th.row-header { text-align: right; padding-right: 8px; width: auto; min-width: auto; position: sticky; left: 0; z-index: 1; background: var(--bg-panel); }
+.matrix th.corner { position: sticky; left: 0; z-index: 2; background: var(--bg-panel); }
+.matrix td.diagonal { background: var(--bg-selected); color: var(--text-muted); }
+.matrix td.nonzero { cursor: pointer; font-weight: 600; }
+.matrix td.nonzero:hover { outline: 2px solid var(--blue); outline-offset: -2px; }
+.matrix td.zero { color: var(--text-muted); opacity: 0.5; }
+.matrix td.cycle { box-shadow: inset 0 0 0 2px var(--red); }
+.matrix tr.row-hover td { background-color: var(--bg-hover); }
+.matrix tr.row-hover td.diagonal { background: var(--bg-selected); }
+.matrix td.col-hover { background-color: var(--bg-hover); }
+.matrix td.col-hover.diagonal { background: var(--bg-selected); }
+.matrix th.total-header { font-size: 10px; color: var(--text-muted); }
+.matrix td.total-cell { background: var(--bg-panel); font-weight: 600; font-size: 11px; }
+</style>
+</head>
+<body>
+<script>
+const REPORT_DATA = "__REPORT_DATA__";
+
+let data = null;
+let selectedModule = null;
+let expandedModules = new Set();
+let expandedDeps = new Set();
+let sortMode = "alpha";
+let reverseIndex = {};
+let currentView = "matrix";
+
+function init() {
+  if (typeof REPORT_DATA === "object" && REPORT_DATA !== null) {
+    data = REPORT_DATA;
+    render();
+  } else {
+    showUpload();
+  }
+}
+
+function showUpload() {
+  document.body.innerHTML = `
+    <div class="upload-overlay">
+      <h2>Governance Report Viewer</h2>
+      <p>Upload a governance JSON report to visualize</p>
+      <div class="upload-zone" id="dropzone">
+        <p>Drop JSON file here or click to browse</p>
+        <input type="file" id="fileinput" accept=".json">
+      </div>
+    </div>
+  `;
+  const zone = document.getElementById("dropzone");
+  const input = document.getElementById("fileinput");
+  zone.addEventListener("click", () => input.click());
+  zone.addEventListener("dragover", (e) => { e.preventDefault(); zone.classList.add("dragover"); });
+  zone.addEventListener("dragleave", () => zone.classList.remove("dragover"));
+  zone.addEventListener("drop", (e) => {
+    e.preventDefault(); zone.classList.remove("dragover");
+    if (e.dataTransfer.files.length) loadFile(e.dataTransfer.files[0]);
+  });
+  input.addEventListener("change", () => { if (input.files.length) loadFile(input.files[0]); });
+}
+
+function loadFile(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      data = JSON.parse(e.target.result);
+      render();
+    } catch (err) {
+      alert("Invalid JSON: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function buildReverseIndex() {
+  reverseIndex = {};
+  if (!data.dependencies) return;
+  for (const [src, targets] of Object.entries(data.dependencies)) {
+    for (const t of targets) {
+      if (!reverseIndex[t.target]) reverseIndex[t.target] = [];
+      reverseIndex[t.target].push({ source: src, count: t.count, files: t.files });
+    }
+  }
+}
+
+function getMetrics(modName) {
+  if (!data.metrics) return null;
+  return data.metrics.find(m => m.name === modName) || null;
+}
+
+function getModuleViolations(modName) {
+  if (!data.violations) return [];
+  return data.violations.filter(v => v.module === modName || (v.detail && v.detail.includes(modName)));
+}
+
+function hasViolation(modName) {
+  if (!data.violations) return false;
+  return data.violations.some(v => v.module === modName);
+}
+
+function getSortedModules() {
+  const mods = data.metrics ? [...data.metrics] : [];
+  if (!mods.length && data.dependencies) {
+    const names = new Set(Object.keys(data.dependencies));
+    for (const targets of Object.values(data.dependencies)) {
+      for (const t of targets) names.add(t.target);
+    }
+    for (const n of names) mods.push({ name: n, total_symbols: 0 });
+  }
+  if (sortMode === "alpha") mods.sort((a, b) => a.name.localeCompare(b.name));
+  else if (sortMode === "symbols") mods.sort((a, b) => b.total_symbols - a.total_symbols);
+  else if (sortMode === "edges") mods.sort((a, b) => (b.external_edges || 0) - (a.external_edges || 0));
+  return mods;
+}
+
+function cohesionClass(v) { if (v === null || v === undefined) return ""; return v >= 0.5 ? "good" : v >= 0.3 ? "warn" : "bad"; }
+function surfaceClass(v) { if (v === null || v === undefined) return ""; return v <= 0.3 ? "good" : v <= 0.5 ? "warn" : "bad"; }
+
+function switchView(view) {
+  currentView = view;
+  render();
+}
+
+function render() {
+  buildReverseIndex();
+  const violationCount = data.violations ? data.violations.length : 0;
+  let mainContent = "";
+  if (currentView === "matrix") {
+    mainContent = `<div class="matrix-container" id="matrix"></div>`;
+  } else {
+    mainContent = `
+      <div class="left-panel">
+        <div class="sort-bar">
+          <span>Sort:</span>
+          <button class="sort-btn ${sortMode === "alpha" ? "active" : ""}" onclick="setSort('alpha')">A-Z</button>
+          <button class="sort-btn ${sortMode === "symbols" ? "active" : ""}" onclick="setSort('symbols')">Symbols</button>
+          <button class="sort-btn ${sortMode === "edges" ? "active" : ""}" onclick="setSort('edges')">Edges</button>
+        </div>
+        <div class="tree" id="tree"></div>
+      </div>
+      <div class="right-panel" id="detail">
+        <div class="placeholder">Select a module from the tree</div>
+      </div>`;
+  }
+  document.body.innerHTML = `
+    <div class="header">
+      <div class="stat"><span class="stat-label">language:</span><span class="stat-value">${esc(data.language || "")}</span></div>
+      <div class="stat"><span class="stat-label">modules:</span><span class="stat-value">${data.module_count || 0}</span></div>
+      <div class="stat"><span class="stat-label">files:</span><span class="stat-value">${data.total_files_scanned || 0}</span></div>
+      <div class="stat"><span class="stat-label">violations:</span><span class="stat-value ${violationCount ? "has-violations" : ""}">${violationCount}</span></div>
+    </div>
+    <div class="tab-bar">
+      <button class="tab-btn ${currentView === "matrix" ? "active" : ""}" onclick="switchView('matrix')">Matrix</button>
+      <button class="tab-btn ${currentView === "modules" ? "active" : ""}" onclick="switchView('modules')">Modules</button>
+    </div>
+    <div class="main">${mainContent}</div>
+  `;
+  if (currentView === "matrix") {
+    renderMatrix();
+  } else {
+    renderTree();
+    if (selectedModule) renderDetail(selectedModule);
+  }
+}
+
+function buildMatrix() {
+  const names = new Set();
+  if (data.metrics) data.metrics.forEach(m => names.add(m.name));
+  if (data.dependencies) {
+    for (const [src, targets] of Object.entries(data.dependencies)) {
+      names.add(src);
+      for (const t of targets) names.add(t.target);
+    }
+  }
+  const sorted = [...names].sort();
+  const matrix = {};
+  for (const r of sorted) {
+    matrix[r] = {};
+    for (const c of sorted) matrix[r][c] = 0;
+  }
+  if (data.dependencies) {
+    for (const [src, targets] of Object.entries(data.dependencies)) {
+      for (const t of targets) {
+        if (matrix[src] && matrix[src][t.target] !== undefined) {
+          matrix[src][t.target] = t.count;
+        }
+      }
+    }
+  }
+  return { names: sorted, matrix };
+}
+
+function renderMatrix() {
+  const container = document.getElementById("matrix");
+  const { names, matrix } = buildMatrix();
+  if (names.length === 0) {
+    container.innerHTML = `<div class="placeholder">No dependency data available</div>`;
+    return;
+  }
+
+  let maxCount = 0;
+  for (const r of names) for (const c of names) {
+    if (r !== c && matrix[r][c] > maxCount) maxCount = matrix[r][c];
+  }
+
+  const totalOut = {};
+  const totalIn = {};
+  for (const n of names) { totalOut[n] = 0; totalIn[n] = 0; }
+  for (const r of names) for (const c of names) {
+    if (r !== c) {
+      totalOut[r] += matrix[r][c];
+      totalIn[c] += matrix[r][c];
+    }
+  }
+
+  let html = `<div class="matrix"><table>`;
+  html += `<thead><tr><th class="corner"></th>`;
+  for (const c of names) {
+    html += `<th class="col-header"><div>${esc(c)} <span style="font-weight:400;color:var(--text-muted);font-size:10px">${totalIn[c]}</span></div></th>`;
+  }
+  html += `<th class="col-header total-header"><div>Total out</div></th>`;
+  html += `</tr></thead><tbody>`;
+
+  for (const r of names) {
+    html += `<tr onmouseenter="matrixRowHover(this,true)" onmouseleave="matrixRowHover(this,false)">`;
+    html += `<th class="row-header">${esc(r)} <span style="font-weight:400;color:var(--text-muted);font-size:10px">${totalOut[r]}</span></th>`;
+    for (let ci = 0; ci < names.length; ci++) {
+      const c = names[ci];
+      if (r === c) {
+        html += `<td class="diagonal" data-col="${ci}">&mdash;</td>`;
+      } else {
+        const count = matrix[r][c];
+        const isCycle = count > 0 && matrix[c][r] > 0;
+        if (count === 0) {
+          html += `<td class="zero" data-col="${ci}">&middot;</td>`;
+        } else {
+          const opacity = (0.15 + 0.85 * (count / maxCount)).toFixed(2);
+          html += `<td class="nonzero${isCycle ? " cycle" : ""}" data-col="${ci}" style="background:rgba(13,110,253,${opacity});color:#fff" onclick="matrixCellClick('${esc(r)}','${esc(c)}')" title="${esc(r)} → ${esc(c)}: ${count}">${count}</td>`;
+        }
+      }
+    }
+    html += `<td class="total-cell" data-col="${names.length}">${totalOut[r]}</td>`;
+    html += `</tr>`;
+  }
+
+  html += `<tr><th class="row-header total-header">Total in</th>`;
+  for (let ci = 0; ci < names.length; ci++) {
+    html += `<td class="total-cell" data-col="${ci}">${totalIn[names[ci]]}</td>`;
+  }
+  html += `<td class="total-cell" data-col="${names.length}"></td></tr>`;
+
+  html += `</tbody></table></div>`;
+  container.innerHTML = html;
+}
+
+function matrixRowHover(tr, entering) {
+  if (entering) {
+    tr.classList.add("row-hover");
+    const cells = tr.querySelectorAll("td");
+    cells.forEach(td => {
+      const col = td.getAttribute("data-col");
+      if (col !== null) {
+        document.querySelectorAll(`td[data-col="${col}"]`).forEach(c => c.classList.add("col-hover"));
+      }
+    });
+  } else {
+    tr.classList.remove("row-hover");
+    document.querySelectorAll(".col-hover").forEach(c => c.classList.remove("col-hover"));
+  }
+}
+
+function matrixCellClick(source, target) {
+  selectedModule = source;
+  expandedDeps.add(`out-${source}-${target}`);
+  currentView = "modules";
+  render();
+}
+
+function renderTree() {
+  const tree = document.getElementById("tree");
+  const mods = getSortedModules();
+  let html = "";
+  for (const mod of mods) {
+    const expanded = expandedModules.has(mod.name);
+    const sel = selectedModule === mod.name;
+    const m = getMetrics(mod.name);
+    const hasV = hasViolation(mod.name);
+    const deps = data.dependencies ? (data.dependencies[mod.name] || []) : [];
+    const edgeCount = deps.reduce((s, d) => s + d.count, 0);
+
+    html += `<div class="mod-row ${sel ? "selected" : ""}" onclick="selectModule('${esc(mod.name)}')" ondblclick="toggleExpand('${esc(mod.name)}')">`;
+    html += `<span class="arrow" onclick="event.stopPropagation(); toggleExpand('${esc(mod.name)}')">${expanded ? "&#9660;" : "&#9654;"}</span>`;
+    html += `<span class="name">${esc(mod.name)}</span>`;
+    html += `<span class="sym-count">${mod.total_symbols} sym</span>`;
+    if (m && m.cohesion_ratio !== null && m.cohesion_ratio !== undefined) {
+      html += ` <span class="badge ${cohesionClass(m.cohesion_ratio)}">C:${m.cohesion_ratio.toFixed(2)}</span>`;
+    }
+    if (m && m.public_surface_ratio !== null && m.public_surface_ratio !== undefined) {
+      html += ` <span class="badge ${surfaceClass(m.public_surface_ratio)}">E:${m.public_surface_ratio.toFixed(2)}</span>`;
+    }
+    if (edgeCount > 0) html += ` <span class="badge">${edgeCount}e</span>`;
+    if (hasV) html += ` <span class="violation-dot" title="Has violations"></span>`;
+    html += `</div>`;
+
+    if (expanded && deps.length) {
+      html += `<div class="file-list">`;
+      for (const dep of deps) {
+        for (const f of dep.files) {
+          const fname = f.file ? (f.file.includes("/") ? f.file.split("/").pop() : f.file) : "";
+          html += `<div class="file-entry">${esc(fname)}:${f.line} <span class="target-link" onclick="event.stopPropagation(); selectModule('${esc(dep.target)}')">&rarr; ${esc(dep.target)}</span></div>`;
+        }
+      }
+      html += `</div>`;
+    }
+  }
+  tree.innerHTML = html;
+}
+
+function selectModule(name) {
+  selectedModule = name;
+  renderTree();
+  renderDetail(name);
+}
+
+function toggleExpand(name) {
+  if (expandedModules.has(name)) expandedModules.delete(name);
+  else expandedModules.add(name);
+  renderTree();
+}
+
+function setSort(mode) {
+  sortMode = mode;
+  render();
+}
+
+function toggleDep(key) {
+  if (expandedDeps.has(key)) expandedDeps.delete(key);
+  else expandedDeps.add(key);
+  renderDetail(selectedModule);
+}
+
+function renderDetail(modName) {
+  const panel = document.getElementById("detail");
+  const m = getMetrics(modName);
+  const deps = data.dependencies ? (data.dependencies[modName] || []) : [];
+  const revDeps = reverseIndex[modName] || [];
+  const violations = getModuleViolations(modName);
+
+  let html = `<div class="detail-title">${esc(modName)}</div>`;
+
+  if (m) {
+    html += `<div class="metrics-group"><div class="metrics-grid">`;
+    html += metricCard("Symbols", m.total_symbols);
+    html += `</div></div>`;
+    const intE = m.internal_edges || 0;
+    const extE = m.external_edges || 0;
+    const totalE = intE + extE;
+    const extSym = m.externally_used_symbols || 0;
+    const totalSym = m.total_symbols || 0;
+
+    html += `<div class="metrics-group"><div class="metrics-group-label">Outgoing — this module's imports</div><div class="metrics-grid">`;
+    html += metricCard("Internal imports", intE, "imports resolved within this module");
+    html += metricCard("External imports", extE, "imports reaching other modules");
+    if (m.cohesion_ratio !== null && m.cohesion_ratio !== undefined) {
+      html += metricCard("Cohesion", m.cohesion_ratio.toFixed(2), `${intE} internal / ${totalE} total imports`);
+    }
+    html += `</div></div>`;
+
+    html += `<div class="metrics-group"><div class="metrics-group-label">Incoming — how others use this module</div><div class="metrics-grid">`;
+    html += metricCard("Symbols used externally", extSym, `out of ${totalSym} total symbols`);
+    if (m.public_surface_ratio !== null && m.public_surface_ratio !== undefined) {
+      html += metricCard("Exposure", m.public_surface_ratio.toFixed(2), `${extSym} / ${totalSym} symbols`);
+    }
+    html += `</div></div>`;
+  }
+
+  html += `<div class="detail-section"><h3>Depends on (${deps.length})</h3>`;
+  if (deps.length === 0) {
+    html += `<div class="empty-state">No outgoing dependencies</div>`;
+  } else {
+    for (const dep of deps) {
+      const key = `out-${modName}-${dep.target}`;
+      const exp = expandedDeps.has(key);
+      html += `<div class="dep-item">`;
+      html += `<div class="dep-header" onclick="toggleDep('${esc(key)}')">`;
+      html += `<span class="dep-arrow">${exp ? "&#9660;" : "&#9654;"}</span>`;
+      html += `<span class="dep-name" onclick="event.stopPropagation(); selectModule('${esc(dep.target)}')">${esc(dep.target)}</span>`;
+      html += `<span class="dep-count">(${dep.count} imports)</span>`;
+      html += `</div>`;
+      if (exp) {
+        html += `<div class="dep-files">`;
+        for (const f of dep.files) {
+          const raw = f.raw_statement ? ` — ${esc(f.raw_statement.trim().substring(0, 80))}` : "";
+          html += `<div>${esc(f.file)}:${f.line}${raw}</div>`;
+        }
+        html += `</div>`;
+      }
+      html += `</div>`;
+    }
+  }
+  html += `</div>`;
+
+  html += `<div class="detail-section"><h3>Depended on by (${revDeps.length})</h3>`;
+  if (revDeps.length === 0) {
+    html += `<div class="empty-state">No incoming dependencies</div>`;
+  } else {
+    for (const dep of revDeps) {
+      const key = `in-${dep.source}-${modName}`;
+      const exp = expandedDeps.has(key);
+      html += `<div class="dep-item">`;
+      html += `<div class="dep-header" onclick="toggleDep('${esc(key)}')">`;
+      html += `<span class="dep-arrow">${exp ? "&#9660;" : "&#9654;"}</span>`;
+      html += `<span class="dep-name" onclick="event.stopPropagation(); selectModule('${esc(dep.source)}')">${esc(dep.source)}</span>`;
+      html += `<span class="dep-count">(${dep.count} imports)</span>`;
+      html += `</div>`;
+      if (exp) {
+        html += `<div class="dep-files">`;
+        for (const f of dep.files) {
+          const raw = f.raw_statement ? ` — ${esc(f.raw_statement.trim().substring(0, 80))}` : "";
+          html += `<div>${esc(f.file)}:${f.line}${raw}</div>`;
+        }
+        html += `</div>`;
+      }
+      html += `</div>`;
+    }
+  }
+  html += `</div>`;
+
+  html += `<div class="detail-section"><h3>Violations (${violations.length})</h3>`;
+  if (violations.length === 0) {
+    html += `<div class="empty-state">No violations</div>`;
+  } else {
+    for (const v of violations) {
+      const cls = v.severity === "warning" ? "warning" : "";
+      html += `<div class="violation-item ${cls}">`;
+      html += `<div class="v-rule">[${esc(v.rule)}] ${esc(v.module)}</div>`;
+      html += `<div class="v-detail">${esc(v.detail)}</div>`;
+      if (v.evidence && v.evidence.length) {
+        html += `<div class="v-evidence">`;
+        for (const e of v.evidence.slice(0, 5)) {
+          const sf = e.source_file || "";
+          const ln = e.line || "";
+          const raw = e.raw_statement ? e.raw_statement.trim().substring(0, 80) : "";
+          html += `<div>${esc(sf)}:${ln} ${esc(raw)}</div>`;
+        }
+        if (v.evidence.length > 5) html += `<div>... and ${v.evidence.length - 5} more</div>`;
+        html += `</div>`;
+      }
+      html += `</div>`;
+    }
+  }
+  html += `</div>`;
+
+  panel.innerHTML = html;
+}
+
+function metricCard(label, value, formula) {
+  let h = `<div class="metric-card"><div class="label">${label}</div><div class="value">${value}</div>`;
+  if (formula) h += `<div class="formula">${esc(formula)}</div>`;
+  h += `</div>`;
+  return h;
+}
+
+function esc(s) {
+  if (s === null || s === undefined) return "";
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>

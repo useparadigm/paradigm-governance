@@ -83,12 +83,22 @@ def _build_file_to_module_map(
     config: GovernanceConfig,
 ) -> dict[str, str]:
     mapping: dict[str, str] = {}
+    # Sort modules so specific paths match before "." catch-all
+    sorted_mods = sorted(config.modules, key=lambda m: (m.path == ".", m.path), reverse=False)
+    catch_all = next((m for m in config.modules if m.path in (".", "./")), None)
+
     for ext in extractions:
-        for mod in config.modules:
+        matched = False
+        for mod in sorted_mods:
             mod_path = mod.path.rstrip("/")
+            if mod_path == ".":
+                continue
             if ext.file_path == mod_path or ext.file_path.startswith(mod_path + "/"):
                 mapping[ext.file_path] = mod.name
+                matched = True
                 break
+        if not matched and catch_all:
+            mapping[ext.file_path] = catch_all.name
     return mapping
 
 
@@ -101,14 +111,25 @@ def _build_importable_map(
     config: GovernanceConfig,
 ) -> dict[str, str]:
     mapping: dict[str, str] = {}
+    sorted_mods = sorted(config.modules, key=lambda m: (m.path == ".", m.path), reverse=False)
+    catch_all = next((m for m in config.modules if m.path in (".", "./")), None)
+
     for ext in extractions:
-        for mod in config.modules:
+        matched_mod = None
+        for mod in sorted_mods:
             mod_path = mod.path.rstrip("/")
+            if mod_path == ".":
+                continue
             if ext.file_path.startswith(mod_path + "/") or ext.file_path == mod_path:
-                dotted = _file_to_dotted(ext.file_path, config)
-                if dotted:
-                    mapping[dotted] = mod.name
+                matched_mod = mod
                 break
+        if not matched_mod and catch_all:
+            matched_mod = catch_all
+
+        if matched_mod:
+            dotted = _file_to_dotted(ext.file_path, config)
+            if dotted:
+                mapping[dotted] = matched_mod.name
     return mapping
 
 

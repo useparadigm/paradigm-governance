@@ -196,6 +196,14 @@ def config_to_toml(config: GovernanceConfig) -> str:
     return "\n".join(lines) + "\n"
 
 
+_SKIP_DIRS = {"node_modules", "__pycache__", ".git", "venv", ".venv"}
+_LANG_EXTENSIONS = {
+    "python": {".py"},
+    "typescript": {".ts", ".tsx", ".js", ".jsx"},
+    "csharp": {".cs"},
+}
+
+
 def generate_config(
     source_root: str | Path,
     language: str = "python",
@@ -207,14 +215,27 @@ def generate_config(
         raise FileNotFoundError(f"Source root not found: {root}")
 
     lang = Language(language)
+    extensions = _LANG_EXTENSIONS.get(language, set())
     modules: list[ModuleConfig] = []
+
+    has_root_files = any(
+        child.is_file() and child.suffix in extensions
+        and not child.name.startswith("_")
+        for child in root.iterdir()
+    )
+    if has_root_files:
+        modules.append(ModuleConfig(
+            name="core",
+            path=".",
+            depends_on=[],
+        ))
 
     for child in sorted(root.iterdir()):
         if not child.is_dir():
             continue
         if child.name.startswith(".") or child.name.startswith("_"):
             continue
-        if child.name in ("node_modules", "__pycache__", ".git", "venv", ".venv"):
+        if child.name in _SKIP_DIRS:
             continue
 
         modules.append(ModuleConfig(
@@ -230,34 +251,43 @@ def generate_config(
     )
 
 
-def generate_config_with_ai(
+def generate_full_config(
     source_root: str | Path,
     language: str = "python",
     config_path: str | Path = "governance.toml",
 ) -> GovernanceConfig:
-    import tempfile
-
-    from paradigm_governance.ai_config_generator import collect_repo_tree, enrich_config_via_ai
+    from paradigm_governance.schemas import RulesConfig
 
     source_root = Path(source_root).resolve()
-    base_config = generate_config(source_root, language)
-    base_toml = config_to_toml(base_config)
-    tree = collect_repo_tree(source_root, language)
-    enriched = enrich_config_via_ai(base_toml, tree)
+    config = generate_config(source_root, language)
 
-    # Write temp config in source_root's parent so root="." resolves correctly
-    tmp_path = source_root.parent / f".governance-tmp-{id(enriched)}.toml"
-    enriched_for_disk = enriched.model_copy(update={"root": source_root.name})
-    tmp_path.write_text(config_to_toml(enriched_for_disk))
+    # Set root relative to where governance.toml will be written
+    config_dir = Path(config_path).resolve().parent
+    try:
+        rel_root = source_root.relative_to(config_dir)
+    except ValueError:
+        rel_root = source_root
+    config.root = str(rel_root)
+
+    # Write temp config to run populate_dependencies
+    tmp_path = source_root.parent / f".governance-tmp-{id(config)}.toml"
+    tmp_config = config.model_copy(update={"root": source_root.name})
+    tmp_path.write_text(config_to_toml(tmp_config))
 
     try:
-        final = populate_dependencies(tmp_path)
+        config = populate_dependencies(tmp_path)
     finally:
         tmp_path.unlink(missing_ok=True)
 
-    # Reset root back to "." for the output config
-    final.root = "."
-    return final
+    # Mirror reality: no enforcement, just ground truth
+    config.rules = RulesConfig(
+        no_cycles=False,
+        enforce_layers=False,
+        enforce_depends_on=False,
+        exclude_test_files=True,
+    )
+    config.root = str(rel_root)
+    return config
 
 
 def populate_dependencies(config_path: str | Path) -> GovernanceConfig:

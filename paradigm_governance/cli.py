@@ -7,7 +7,7 @@ from pathlib import Path
 
 import tomllib
 
-from paradigm_governance.engine import config_to_toml, discover_dependencies, generate_config, generate_config_with_ai, populate_dependencies, run_governance, run_governance_diff
+from paradigm_governance.engine import config_to_toml, discover_dependencies, generate_config, generate_full_config, populate_dependencies, run_governance, run_governance_diff
 
 
 def main():
@@ -61,7 +61,7 @@ def main():
     parser.add_argument(
         "--generate",
         action="store_true",
-        help="Generate governance.toml using AI to infer layers, rules, and module groupings",
+        help="Generate governance.toml with modules and real dependencies from source (ground truth, no enforcement)",
     )
     parser.add_argument(
         "--source-root",
@@ -153,15 +153,12 @@ def _handle_generate(args):
         print(f"Config file already exists: {out_path}", file=sys.stderr)
         sys.exit(1)
 
-    config = generate_config_with_ai(args.source_root, args.language, args.config)
+    config = generate_full_config(args.source_root, args.language, args.config)
     toml_str = config_to_toml(config)
     out_path.write_text(toml_str)
 
-    layers = config.layers.order
     total_deps = sum(len(m.depends_on) for m in config.modules)
-    print(f"Generated {out_path} with {len(config.modules)} modules, {len(layers)} layers, {total_deps} dependencies")
-    if layers:
-        print(f"Layers (high → low): {' → '.join(layers)}")
+    print(f"Generated {out_path} with {len(config.modules)} modules, {total_deps} dependencies")
 
 
 def _handle_fix_deps(args):

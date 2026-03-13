@@ -6,10 +6,8 @@ requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.0",
     "ast-grep-py>=0.28",
+    "openai>=1.0",
 ]
-
-[project.optional-dependencies]
-ai = ["openai>=1.0"]
 
 [project.scripts]
 governance-ast = "paradigm_governance.cli:main"

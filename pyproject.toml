@@ -2,11 +2,12 @@
 name = "paradigm-governance"
 version = "0.1.0"
 description = "AST-based governance engine for enforcing module boundaries and architecture rules"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "pydantic>=2.0",
     "ast-grep-py>=0.28",
     "openai>=1.0",
+    "tomli>=2.0; python_version < '3.11'",
 ]
 
 [project.scripts]

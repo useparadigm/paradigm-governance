@@ -5,7 +5,7 @@ language = "python"
 [[modules]]
 name = "core"
 path = "."
-depends_on = ["languages", "advisor"]
+depends_on = ["advisor", "languages"]
 layer = "engine"
 
 [[modules]]
@@ -26,6 +26,11 @@ path = "viewer/"
 depends_on = []
 layer = "viewer"
 
+[[modules]]
+name = "exporters"
+path = "exporters/"
+depends_on = ["core"]
+
 [layers]
 order = []
 
@@ -35,3 +40,4 @@ enforce_layers = false
 enforce_depends_on = true
 exclude_test_files = true
 exclude_from_cycles = ["core", "languages"]
+

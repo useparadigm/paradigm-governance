@@ -81,3 +81,28 @@ def test_cli_missing_config():
     result = _run_cli("--config", "nonexistent.toml")
     assert result.returncode == 1
     assert "Config not found" in result.stderr
+
+
+def test_cli_auto():
+    result = subprocess.run(
+        [sys.executable, "-m", "paradigm_governance", "--auto", str(SAMPLE_PROJECT)],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1  # has cycle: core <-> db
+    assert "Governance Report" in result.stdout
+    assert "no_cycles" in result.stdout
+    assert "auto-scan" in result.stdout
+
+
+def test_cli_auto_json():
+    result = subprocess.run(
+        [sys.executable, "-m", "paradigm_governance", "--auto", str(SAMPLE_PROJECT), "--format", "json"],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    import json
+    data = json.loads(result.stdout)
+    assert data["config_path"] == "(auto-scan)"
+    assert len(data["violations"]) > 0

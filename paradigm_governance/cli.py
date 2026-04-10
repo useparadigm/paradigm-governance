@@ -5,7 +5,7 @@ import json
 import sys
 from pathlib import Path
 
-from paradigm_governance.engine import config_to_toml, discover_dependencies, generate_config, generate_full_config, populate_dependencies, run_governance, run_governance_diff
+from paradigm_governance.engine import config_to_toml, discover_dependencies, generate_config, generate_full_config, populate_dependencies, run_auto_scan, run_governance, run_governance_diff
 
 
 def main():
@@ -77,8 +77,19 @@ def main():
         action="store_true",
         help="Use LLM to generate architectural advice for violations and new modules",
     )
+    parser.add_argument(
+        "--auto",
+        metavar="PATH",
+        nargs="?",
+        const=".",
+        help="Zero-config scan: discover modules from source and check for cycles. No governance.toml needed.",
+    )
 
     args = parser.parse_args()
+
+    if args.auto is not None:
+        _handle_auto(args)
+        return
 
     if args.format == "html":
         _handle_html_output(args)
@@ -272,6 +283,22 @@ def _handle_advise(args, report=None):
         print(json.dumps(advice.model_dump(), indent=2))
     else:
         print(advice.to_markdown())
+
+
+def _handle_auto(args):
+    source_root = Path(args.auto).resolve()
+    if not source_root.exists():
+        print(f"Source root not found: {source_root}", file=sys.stderr)
+        sys.exit(1)
+
+    report = run_auto_scan(source_root)
+
+    if args.format == "json":
+        print(json.dumps(report.model_dump(), indent=2))
+    else:
+        _print_text_report(report)
+
+    sys.exit(0 if report.passed else 1)
 
 
 def _print_discover_report(report):

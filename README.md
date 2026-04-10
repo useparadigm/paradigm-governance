@@ -21,7 +21,12 @@ governance-ast
 
 # Discover dependencies (no enforcement)
 governance-ast --discover
+
+# Interactive HTML report
+governance-ast --format html > report.html
 ```
+
+The HTML report is a self-contained file with a dependency matrix (modules × modules heatmap, cycles highlighted) and a module detail view (metrics, dependencies, violations). You can also drop any governance JSON report into it.
 
 ## Config
 

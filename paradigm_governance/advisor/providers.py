@@ -72,7 +72,7 @@ class OpenAIProvider(LLMProvider):
         self.model = model or os.environ.get("GOVERNANCE_LLM_MODEL", DEFAULT_OPENAI_MODEL)
 
     def complete(self, system: str, user: str) -> AdviceReport:
-        schema = AdviceReport.model_json_schema()
+        schema = _make_openai_strict_schema(AdviceReport.model_json_schema())
 
         response = httpx.post(
             "https://api.openai.com/v1/chat/completions",
@@ -136,6 +136,35 @@ def get_provider() -> LLMProvider:
 class ConfigError(Exception):
     """Raised when LLM provider configuration is missing or invalid."""
     pass
+
+
+def _make_openai_strict_schema(schema: dict) -> dict:
+    """Patch a JSON schema for OpenAI strict mode.
+
+    OpenAI requires additionalProperties=false on all objects,
+    all properties must be required, and no defaults.
+    """
+    schema = schema.copy()
+
+    def _patch(obj: dict) -> dict:
+        obj = obj.copy()
+        if obj.get("type") == "object":
+            obj["additionalProperties"] = False
+            if "properties" in obj:
+                obj["required"] = list(obj["properties"].keys())
+                obj["properties"] = {
+                    k: _patch(v) for k, v in obj["properties"].items()
+                }
+        if "items" in obj:
+            obj["items"] = _patch(obj["items"])
+        if "$defs" in obj:
+            obj["$defs"] = {k: _patch(v) for k, v in obj["$defs"].items()}
+        # Remove defaults — strict mode doesn't allow them
+        obj.pop("default", None)
+        obj.pop("title", None)
+        return obj
+
+    return _patch(schema)
 
 
 def _log_usage(usage: dict) -> None:

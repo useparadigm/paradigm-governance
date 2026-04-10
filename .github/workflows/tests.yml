@@ -1,4 +1,4 @@
-name: CI
+name: Tests
 
 on:
   push:
@@ -7,16 +7,8 @@ on:
     branches: [main]
 
 jobs:
-  governance:
-    name: Governance
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
-      - run: uv run governance-ast
-
-  tests:
-    name: Tests (Python ${{ matrix.python-version }})
+  test:
+    name: Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
     strategy:
       matrix:

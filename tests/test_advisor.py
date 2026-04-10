@@ -52,9 +52,8 @@ def test_advice_report_to_markdown():
         ],
     )
     md = report.to_markdown()
-    assert "AI Architecture Advice" in md
-    assert "Restructure" in md
-    assert "small" in md
+    assert "🤖 AI:" in md
+    assert "Move shared types" in md
     assert "exporters" in md
     assert "infrastructure" in md
 

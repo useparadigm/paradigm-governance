@@ -288,6 +288,51 @@ def generate_full_config(
     return config
 
 
+def run_auto_scan(source_root: str | Path) -> GovernanceReport:
+    """Zero-config scan: discover modules from source, check for cycles and undeclared deps."""
+    from code_governance.schemas import RulesConfig
+
+    source_root = Path(source_root).resolve()
+    if not source_root.exists():
+        raise FileNotFoundError(f"Source root not found: {source_root}")
+
+    config = generate_config(source_root, "python")
+    config.root = "."
+    config.rules = RulesConfig(
+        no_cycles=True,
+        enforce_layers=False,
+        enforce_depends_on=False,
+        exclude_test_files=True,
+    )
+
+    extractions = extract_directory(source_root, config.language, config.rules.exclude_test_files)
+    graph = build_dependency_graph(extractions, config)
+
+    # Populate actual depends_on so discover report is useful
+    module_names = {mod.name for mod in config.modules}
+    for mod in config.modules:
+        deps = sorted(
+            t for t in graph.module_edges.get(mod.name, {})
+            if t in module_names and t != mod.name
+        )
+        mod.depends_on = deps
+
+    violations: list[Violation] = []
+    for rule_fn in ALL_RULES:
+        violations.extend(rule_fn(graph, config))
+
+    metrics = compute_module_metrics(graph, config)
+
+    return GovernanceReport(
+        config_path="(auto-scan)",
+        language=config.language,
+        module_count=len(config.modules),
+        total_files_scanned=len(extractions),
+        violations=violations,
+        metrics=metrics,
+    )
+
+
 def populate_dependencies(config_path: str | Path) -> GovernanceConfig:
     config_path = Path(config_path)
     config = load_config(config_path)

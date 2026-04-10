@@ -177,6 +177,31 @@ Analyzes your violations with an LLM and suggests whether to accept the dependen
 | `ANTHROPIC_API_KEY` | Anthropic (default: claude-sonnet-4-20250514) |
 | `GOVERNANCE_LLM_MODEL` | Override model |
 
+## vs import-linter
+
+[import-linter](https://github.com/seddonym/import-linter) is the established tool for this. Here's an honest comparison:
+
+| | paradigm-governance | import-linter |
+|---|---|---|
+| **Setup** | `--generate` creates config from source | Manual contract definition |
+| **Config format** | TOML (governance.toml) | INI or TOML |
+| **Rules** | depends_on, cycles, layers, cohesion, surface | independence, layers, forbidden, acyclic siblings |
+| **Diff mode** | `--diff HEAD` — only check changed files | No |
+| **Baseline** | Accept existing violations, fail on new | No |
+| **CI comments** | PR comments with violations + fix suggestions | No |
+| **Auto-fix** | `/governance fix` applies config updates | No |
+| **LLM advice** | `--advise` — architectural recommendations | No |
+| **HTML report** | Dependency matrix + module detail viewer | Browser UI (separate) |
+| **JSON output** | Yes | No |
+| **Module metrics** | Cohesion, public surface, symbol count | No |
+| **Indirect imports** | Direct only | Transitive chains |
+| **Parser** | ast-grep (Rust) | grimp (compiled) |
+| **Speed (Django, 902 files)** | ~1.2s | ~0.1s |
+| **Package needs installing** | No — scans source files directly | Yes — must be importable |
+| **Agent-friendly** | Claude Code skills included | No |
+
+**Choose import-linter if** you need transitive import detection or forbidden contracts. **Choose paradigm-governance if** you want CI integration, auto-fix, LLM advice, metrics, or zero-config setup.
+
 ## Agent-friendly
 
 Ships with Claude Code skills in `.claude/skills/` that teach AI coding agents how to run checks, interpret violations, and generate configs.

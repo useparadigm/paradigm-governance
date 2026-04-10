@@ -2,7 +2,7 @@
 
 AST-based governance engine for enforcing module boundaries and architecture rules in Python codebases. Think [import-linter](https://github.com/seddonym/import-linter) but powered by [ast-grep](https://ast-grep.github.io/) for fast, accurate parsing.
 
-Define your modules and allowed dependencies in a `governance.toml` file, then run checks in CI or locally. Detects circular dependencies, undeclared imports across module boundaries, layer violations, and reports module health metrics (cohesion, public surface area).
+Define your modules and allowed dependencies in a `governance.toml` file, then run checks in CI or locally. Detects circular dependencies, undeclared imports across module boundaries, layer violations, and reports module health metrics.
 
 ## Install
 
@@ -10,25 +10,20 @@ Define your modules and allowed dependencies in a `governance.toml` file, then r
 pip install paradigm-governance
 ```
 
-Or with uv:
-
-```bash
-uv add paradigm-governance
-```
-
 ## Quick Start
 
-### 1. Generate a config from your project
-
 ```bash
-# Auto-detect modules from folder structure
-governance-ast --fix-config --source-root src/
-
-# Or generate with real dependency data pre-populated
+# Generate config from your project structure + real imports
 governance-ast --generate --source-root src/
+
+# Run governance checks
+governance-ast
+
+# Discover dependencies (no enforcement)
+governance-ast --discover
 ```
 
-This creates `governance.toml`:
+## Config
 
 ```toml
 [governance]
@@ -39,19 +34,22 @@ language = "python"
 name = "api"
 path = "api/"
 depends_on = ["core", "db"]
+layer = "presentation"
 
 [[modules]]
 name = "core"
 path = "core/"
 depends_on = []
+layer = "domain"
 
 [[modules]]
 name = "db"
 path = "db/"
 depends_on = ["core"]
+layer = "infrastructure"
 
 [layers]
-order = ["api", "db", "core"]
+order = ["presentation", "infrastructure", "domain"]
 
 [rules]
 no_cycles = true
@@ -60,126 +58,46 @@ enforce_depends_on = true
 exclude_test_files = true
 ```
 
-### 2. Run governance checks
+### Rules
 
-```bash
-# Check for violations
-governance-ast
+| Rule | Description |
+|------|-------------|
+| `no_cycles` | Detect circular dependencies between modules |
+| `enforce_depends_on` | Flag imports not listed in `depends_on` |
+| `enforce_layers` | Prevent lower layers importing higher ones |
+| `max_public_surface` | Warn if too many symbols are used externally (float threshold) |
+| `min_cohesion` | Warn if internal-to-total import ratio is too low (float threshold) |
 
-# JSON output
-governance-ast --format json
-
-# Interactive HTML report
-governance-ast --format html > report.html
-```
-
-### 3. Discover actual dependencies
-
-```bash
-# See what imports what (without enforcement)
-governance-ast --discover
-```
-
-Output:
-
-```
-Module Dependencies — discovered (python)
-Modules: 3 | Files scanned: 12
-
-  api (15 symbols)
-    → core                 8 imports   (routes.py:3, views.py:1, ...)
-    → db                   4 imports   (routes.py:5, views.py:8)
-
-  db (6 symbols)
-    → core                 3 imports   (repository.py:1, ...)
-```
-
-## Config Reference
-
-### `[governance]`
-
-| Key | Description | Default |
-|-----|-------------|---------|
-| `root` | Source root relative to config file | `"."` |
-| `language` | Language to analyze | `"python"` |
-| `package_prefix` | Optional package prefix to strip from imports | — |
-
-### `[[modules]]`
-
-| Key | Description |
-|-----|-------------|
-| `name` | Module identifier |
-| `path` | Directory path relative to root |
-| `depends_on` | List of module names this module may import from |
-| `layer` | Optional layer assignment (e.g. `"api"`, `"domain"`) |
-
-### `[layers]`
-
-| Key | Description |
-|-----|-------------|
-| `order` | Ordered list from highest to lowest. Higher layers can depend on lower, not vice versa. |
-
-### `[rules]`
-
-| Key | Description | Default |
-|-----|-------------|---------|
-| `no_cycles` | Detect circular dependencies between modules | `true` |
-| `enforce_depends_on` | Flag imports not listed in `depends_on` | `true` |
-| `enforce_layers` | Prevent higher layers from being imported by lower layers | `false` |
-| `max_public_surface` | Warn if ratio of externally-used symbols exceeds threshold | — |
-| `min_cohesion` | Warn if ratio of internal-to-total imports is below threshold | — |
-| `exclude_test_files` | Skip test files during analysis | `true` |
-| `exclude_from_cycles` | List of module names to exclude from cycle detection | `[]` |
-
-## CI Usage
-
-### Check only changed files
-
-```bash
-governance-ast --diff HEAD~1
-```
-
-### Baseline workflow
-
-Accept existing violations and only fail on new ones:
-
-```bash
-# Save current state as baseline
-governance-ast --save-baseline .governance-baseline.json
-
-# Check against baseline (only new violations fail)
-governance-ast --baseline .governance-baseline.json
-```
-
-Combined with `--diff`, it auto-loads `.governance-baseline.json` if present:
-
-```bash
-governance-ast --diff HEAD~1
-```
+## CI
 
 ### GitHub Action
 
-Use the reusable action in your workflow:
-
 ```yaml
 - uses: actions/checkout@v4
-- name: Check governance
+- name: Governance
   uses: useparadigm/paradigm-governance@main
   with:
     config: governance.toml
-    diff: origin/main
+    diff: origin/main          # only check changed files
+    advise: true               # LLM architectural advice
+  env:
+    OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}  # or ANTHROPIC_API_KEY
 ```
 
-With baseline:
+This posts a comment on your PR:
 
-```yaml
-- uses: actions/checkout@v4
-- name: Check governance
-  uses: useparadigm/paradigm-governance@main
-  with:
-    config: governance.toml
-    diff: origin/main
-    baseline: .governance-baseline.json
+```
+## ❌ Governance — 1 violation, 1 new module
+
+🔴 🔗 core: Undeclared dependency: 'core' imports 'db' (allowed: [])
+  core/service.py:2
+
+📦 New module exporters (exporters/) — not in governance.toml
+
+Reply /governance fix to apply.
+
+🤖 AI: The core→db import creates tight coupling. Extract shared
+types into a common module, or add "db" to core's depends_on.
 ```
 
 All inputs:
@@ -189,34 +107,145 @@ All inputs:
 | `config` | Path to `governance.toml` | `governance.toml` |
 | `diff` | Only check files changed since this ref | — |
 | `baseline` | Path to baseline JSON | — |
-| `format` | Output format (`text` or `json`) | `text` |
-| `version` | Package version to install | latest |
-| `python-version` | Python version | `3.12` |
+| `advise` | LLM advice (needs API key in env) | `false` |
+| `comment` | Post PR comment | `true` |
 
-Outputs: `passed` (true/false), `violations` (count), `report` (full output).
+### `/governance fix` command
+
+When the governance comment detects new modules, reply `/governance fix` on the PR to auto-apply the config update. The bot:
+
+1. Reacts 👀 (acknowledged)
+2. Adds new modules to `governance.toml` with `depends_on` populated from actual imports
+3. Commits to your PR branch
+4. Reacts 👍 and confirms
+
+To enable this, add `.github/workflows/governance-fix.yml` to your repo:
+
+```yaml
+name: Governance Fix
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  apply-fix:
+    name: Apply config fix
+    runs-on: ubuntu-latest
+    if: |
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/governance fix')
+    steps:
+      - name: Acknowledge
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions \
+            -X POST -f content=eyes
+
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+
+      - name: Checkout PR branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr checkout ${{ github.event.issue.number }}
+
+      - name: Find and apply fix
+        id: fix
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PAYLOAD=$(gh api repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
+            --jq '.[] | select(.body | contains("<!-- governance-fix:")) | .body' \
+            | grep -oP '<!-- governance-fix:\K[A-Za-z0-9+/=]+' | tail -1)
+
+          if [ -z "$PAYLOAD" ]; then
+            gh api repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions \
+              -X POST -f content=confused
+            exit 1
+          fi
+
+          DECODED=$(echo "$PAYLOAD" | base64 -d)
+          CONFIG_PATH=$(echo "$DECODED" | python3 -c "import sys,json; print(json.load(sys.stdin)['config_path'])")
+          echo "$DECODED" | python3 -c "import sys,json; print(json.load(sys.stdin)['updated_config'])" > "$CONFIG_PATH"
+
+          pip install paradigm-governance
+          governance-ast --config "$CONFIG_PATH" --fix-deps || true
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$CONFIG_PATH"
+          git diff --cached --quiet && exit 0
+
+          git commit -m "governance: add new modules to config"
+          git push
+          echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Confirm
+        if: steps.fix.outputs.sha
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions \
+            -X POST -f content='+1'
+          gh pr comment ${{ github.event.issue.number }} \
+            --body "✅ Config fix applied in \`${{ steps.fix.outputs.sha }}\`. Re-run checks to verify."
+```
 
 ### Pre-commit
-
-Add to your `.pre-commit-config.yaml`:
 
 ```yaml
 repos:
   - repo: https://github.com/useparadigm/paradigm-governance
     rev: main
     hooks:
-      - id: governance-check        # full check
+      - id: governance-check
       # or
-      - id: governance-diff         # only changed files
+      - id: governance-diff   # only changed files
 ```
+
+### CLI in CI
+
+```bash
+governance-ast --diff origin/main
+```
+
+### Baseline workflow
+
+```bash
+# Save current violations as accepted
+governance-ast --save-baseline .governance-baseline.json
+
+# Only fail on new violations
+governance-ast --baseline .governance-baseline.json
+```
+
+## LLM Advice
+
+`--advise` calls an LLM to analyze violations and suggest fixes:
+
+```bash
+export OPENAI_API_KEY=sk-...   # or ANTHROPIC_API_KEY
+governance-ast --advise
+```
+
+Supports OpenAI and Anthropic. Configure with env vars:
+
+| Env var | Description |
+|---------|-------------|
+| `OPENAI_API_KEY` | Use OpenAI (default model: gpt-4o) |
+| `ANTHROPIC_API_KEY` | Use Anthropic (default model: claude-sonnet-4-20250514) |
+| `GOVERNANCE_LLM_PROVIDER` | Override: `openai` or `anthropic` |
+| `GOVERNANCE_LLM_MODEL` | Override model name |
 
 ## Agent-Friendly
 
-This tool ships with Claude Code skills in `.claude/skills/` that teach AI agents how to:
-
-- **Use the CLI** — run checks, interpret output, fix violations
-- **Generate configs** — brainstorm module boundaries, assign layers, set up rules
-
-See `.claude/skills/governance.md` and `.claude/skills/governance-config.md`.
+Ships with Claude Code skills in `.claude/skills/` that teach AI agents how to use the CLI and generate configs. See `governance.md` and `governance-config.md`.
 
 ## License
 

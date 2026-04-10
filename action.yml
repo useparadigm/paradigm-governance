@@ -25,6 +25,10 @@ inputs:
     description: "Post a PR comment with the governance report"
     required: false
     default: "true"
+  advise:
+    description: "Use LLM to generate architectural advice (requires ANTHROPIC_API_KEY or OPENAI_API_KEY)"
+    required: false
+    default: "false"
   version:
     description: "paradigm-governance version to install"
     required: false
@@ -66,8 +70,13 @@ runs:
       id: report
       shell: bash
       run: |
+        ADVISE_FLAG=""
+        if [ "${{ inputs.advise }}" = "true" ]; then
+          ADVISE_FLAG="--advise"
+        fi
+
         set +e
-        output=$(governance-ci-report --config "${{ inputs.config }}" --json 2>&1)
+        output=$(governance-ci-report --config "${{ inputs.config }}" --json $ADVISE_FLAG 2>&1)
         exit_code=$?
         set -e
 

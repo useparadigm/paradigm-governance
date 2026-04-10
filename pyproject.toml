@@ -8,6 +8,7 @@ readme = "README.md"
 dependencies = [
     "pydantic>=2.0",
     "ast-grep-py>=0.28.1",
+    "httpx>=0.25",
     "tomli>=2.0; python_version < '3.11'",
 ]
 classifiers = [

@@ -136,6 +136,7 @@ def _suggest_config_update(
 
 def generate_ci_report(
     config_path: str | Path,
+    advise: bool = False,
 ) -> dict:
     """Generate a full CI report with violations, new modules, and suggestions.
 
@@ -219,6 +220,23 @@ def generate_ci_report(
         lines.append("</details>")
         lines.append("")
 
+    # LLM advice
+    advice_data = None
+    if advise and (report.violations or new_modules):
+        try:
+            from paradigm_governance.advisor import generate_advice
+
+            advice = generate_advice(config_path, governance_report=report, new_modules=new_modules)
+            if advice:
+                lines.append("---")
+                lines.append("")
+                lines.append(advice.to_markdown())
+                advice_data = advice.model_dump()
+        except Exception as e:
+            lines.append("---")
+            lines.append("")
+            lines.append(f"## AI Architecture Advice\n\n⚠️ LLM advice unavailable: {e}")
+
     markdown = "\n".join(lines)
 
     return {
@@ -226,6 +244,7 @@ def generate_ci_report(
         "violations": [v.model_dump() for v in report.violations],
         "new_modules": new_modules,
         "updated_config": updated_config,
+        "advice": advice_data,
         "passed": report.passed and len(new_modules) == 0,
     }
 
@@ -239,9 +258,10 @@ def main():
     parser.add_argument("--output-markdown", help="Write markdown report to file")
     parser.add_argument("--output-config", help="Write updated governance.toml (if new modules found)")
     parser.add_argument("--json", action="store_true", help="Output full report as JSON")
+    parser.add_argument("--advise", action="store_true", help="Use LLM to generate architectural advice")
     args = parser.parse_args()
 
-    result = generate_ci_report(args.config)
+    result = generate_ci_report(args.config, advise=args.advise)
 
     if args.json:
         print(json.dumps(result, indent=2))

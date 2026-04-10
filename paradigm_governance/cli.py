@@ -72,6 +72,11 @@ def main():
         choices=["python"],
         help="Language for --fix-config / --generate (default: python)",
     )
+    parser.add_argument(
+        "--advise",
+        action="store_true",
+        help="Use LLM to generate architectural advice for violations and new modules",
+    )
 
     args = parser.parse_args()
 
@@ -242,7 +247,31 @@ def _handle_check(args):
     else:
         _print_text_report(report, accepted_count=accepted_count)
 
+    if args.advise and (report.violations or not report.passed):
+        _handle_advise(args, report)
+
     sys.exit(0 if report.passed else 1)
+
+
+def _handle_advise(args, report=None):
+    from paradigm_governance.advisor import generate_advice
+    from paradigm_governance.advisor.providers import ConfigError
+
+    config_path = Path(args.config)
+    try:
+        advice = generate_advice(config_path, governance_report=report)
+    except ConfigError as e:
+        print(f"\n{e}", file=sys.stderr)
+        return
+
+    if advice is None:
+        return
+
+    print()
+    if args.format == "json":
+        print(json.dumps(advice.model_dump(), indent=2))
+    else:
+        print(advice.to_markdown())
 
 
 def _print_discover_report(report):

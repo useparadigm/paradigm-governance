@@ -4,13 +4,13 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from paradigm_governance.advisor.context import build_context
-from paradigm_governance.advisor.prompts import SYSTEM_PROMPT, build_user_prompt
-from paradigm_governance.advisor.providers import ConfigError, get_provider
-from paradigm_governance.advisor.schemas import AdviceReport
-from paradigm_governance.config import load_config
-from paradigm_governance.engine import discover_dependencies, run_governance
-from paradigm_governance.schemas import GovernanceReport
+from code_governance.advisor.context import build_context
+from code_governance.advisor.prompts import SYSTEM_PROMPT, build_user_prompt
+from code_governance.advisor.providers import ConfigError, get_provider
+from code_governance.advisor.schemas import AdviceReport
+from code_governance.config import load_config
+from code_governance.engine import discover_dependencies, run_governance
+from code_governance.schemas import GovernanceReport
 
 
 def generate_advice(

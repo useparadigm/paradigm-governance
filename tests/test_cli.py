@@ -7,7 +7,7 @@ SAMPLE_PROJECT = Path(__file__).parent / "fixtures" / "sample_project"
 
 def _run_cli(*args: str) -> subprocess.CompletedProcess:
     return subprocess.run(
-        [sys.executable, "-m", "paradigm_governance", *args],
+        [sys.executable, "-m", "code_governance", *args],
         capture_output=True,
         text=True,
         cwd=str(SAMPLE_PROJECT),
@@ -46,7 +46,7 @@ def test_cli_discover_json():
 
 def test_cli_fix_config(tmp_path):
     result = subprocess.run(
-        [sys.executable, "-m", "paradigm_governance",
+        [sys.executable, "-m", "code_governance",
          "--fix-config", "--source-root", str(SAMPLE_PROJECT),
          "--config", str(tmp_path / "governance.toml")],
         capture_output=True,
@@ -60,7 +60,7 @@ def test_cli_fix_config(tmp_path):
 
 def test_cli_generate(tmp_path):
     result = subprocess.run(
-        [sys.executable, "-m", "paradigm_governance",
+        [sys.executable, "-m", "code_governance",
          "--generate", "--source-root", str(SAMPLE_PROJECT),
          "--config", str(tmp_path / "governance.toml")],
         capture_output=True,

@@ -1,6 +1,6 @@
-from paradigm_governance.config import load_config
-from paradigm_governance.dep_graph import build_dependency_graph
-from paradigm_governance.extractor import extract_directory
+from code_governance.config import load_config
+from code_governance.dep_graph import build_dependency_graph
+from code_governance.extractor import extract_directory
 
 
 def test_build_graph_finds_modules(sample_config):

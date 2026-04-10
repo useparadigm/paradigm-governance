@@ -8,7 +8,7 @@ else:
     import tomli as tomllib
 from pathlib import Path
 
-from paradigm_governance.schemas import (
+from code_governance.schemas import (
     GovernanceConfig,
     LayersConfig,
     ModuleConfig,

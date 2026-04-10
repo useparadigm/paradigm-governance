@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
 
-from paradigm_governance.config import load_config
+from code_governance.config import load_config
 
 
 def test_load_valid_config(sample_config):

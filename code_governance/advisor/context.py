@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from paradigm_governance.engine import config_to_toml, generate_config
-from paradigm_governance.schemas import (
+from code_governance.engine import config_to_toml, generate_config
+from code_governance.schemas import (
     DiscoverReport,
     GovernanceConfig,
     GovernanceReport,

@@ -5,13 +5,13 @@ import base64
 import json
 from pathlib import Path
 
-from paradigm_governance.config import load_config
-from paradigm_governance.engine import (
+from code_governance.config import load_config
+from code_governance.engine import (
     config_to_toml,
     generate_config,
     run_governance,
 )
-from paradigm_governance.schemas import GovernanceConfig, RuleKind, Violation
+from code_governance.schemas import GovernanceConfig, RuleKind, Violation
 
 
 RULE_ICON = {
@@ -60,7 +60,7 @@ def _suggest_config_update(
     config: GovernanceConfig,
     new_modules: list[dict[str, str]],
 ) -> str:
-    from paradigm_governance.schemas import ModuleConfig
+    from code_governance.schemas import ModuleConfig
 
     updated = config.model_copy(deep=True)
     for mod in new_modules:
@@ -140,7 +140,7 @@ def generate_ci_report(
     advice_data = None
     if advise and (report.violations or new_modules):
         try:
-            from paradigm_governance.advisor import generate_advice
+            from code_governance.advisor import generate_advice
 
             advice = generate_advice(config_path, governance_report=report, new_modules=new_modules)
             if advice:

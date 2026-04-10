@@ -5,8 +5,8 @@ from pathlib import Path
 
 from ast_grep_py import SgRoot
 
-from paradigm_governance.languages import get_patterns
-from paradigm_governance.schemas import FileExtractionResult, Language
+from code_governance.languages import get_patterns
+from code_governance.schemas import FileExtractionResult, Language
 
 
 def extract_file(file_path: str, source: str, language: Language) -> FileExtractionResult:

@@ -1,5 +1,5 @@
-from paradigm_governance.extractor import extract_file
-from paradigm_governance.schemas import Language
+from code_governance.extractor import extract_file
+from code_governance.schemas import Language
 
 
 def test_extract_imports():

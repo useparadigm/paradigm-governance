@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from paradigm_governance.languages.python import PythonPatterns
-from paradigm_governance.schemas import Language
+from code_governance.languages.python import PythonPatterns
+from code_governance.schemas import Language
 
 LANGUAGE_PATTERNS = {
     Language.PYTHON: PythonPatterns,

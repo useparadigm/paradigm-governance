@@ -1,5 +1,5 @@
 [project]
-name = "paradigm-governance"
+name = "code-governance"
 version = "0.1.0"
 description = "AST-based governance engine for enforcing module boundaries and architecture rules in Python codebases"
 requires-python = ">=3.10"
@@ -24,13 +24,13 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/useparadigm/paradigm-governance"
-Repository = "https://github.com/useparadigm/paradigm-governance"
-Issues = "https://github.com/useparadigm/paradigm-governance/issues"
+Homepage = "https://github.com/useparadigm/code-governance"
+Repository = "https://github.com/useparadigm/code-governance"
+Issues = "https://github.com/useparadigm/code-governance/issues"
 
 [project.scripts]
-governance-ast = "paradigm_governance.cli:main"
-governance-ci-report = "paradigm_governance.ci_report:main"
+governance-ast = "code_governance.cli:main"
+governance-ci-report = "code_governance.ci_report:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0"]

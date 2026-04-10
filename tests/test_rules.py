@@ -1,7 +1,7 @@
-from paradigm_governance.config import load_config
-from paradigm_governance.dep_graph import build_dependency_graph
-from paradigm_governance.extractor import extract_directory
-from paradigm_governance.rules import (
+from code_governance.config import load_config
+from code_governance.dep_graph import build_dependency_graph
+from code_governance.extractor import extract_directory
+from code_governance.rules import (
     check_enforce_depends_on,
     check_enforce_layers,
     check_min_cohesion,
@@ -9,7 +9,7 @@ from paradigm_governance.rules import (
     check_no_cycles,
     compute_module_metrics,
 )
-from paradigm_governance.schemas import RuleKind
+from code_governance.schemas import RuleKind
 
 
 def _build_graph(sample_config):

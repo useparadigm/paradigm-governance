@@ -1,15 +1,15 @@
-# Skill: Using paradigm-governance
+# Skill: Using code-governance
 
 Use this skill when asked to check architecture rules, find dependency violations, analyze module boundaries, or run governance checks on a Python codebase.
 
 ## Prerequisites
 
-The project needs `paradigm-governance` installed and a `governance.toml` config file.
+The project needs `code-governance` installed and a `governance.toml` config file.
 
 ```bash
 # Install if not present
-uv add paradigm-governance
-# or: pip install paradigm-governance
+uv add code-governance
+# or: pip install code-governance
 ```
 
 ## Running Checks

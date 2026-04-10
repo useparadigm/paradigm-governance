@@ -1,5 +1,5 @@
 [governance]
-root = "paradigm_governance"
+root = "code_governance"
 language = "python"
 
 [[modules]]

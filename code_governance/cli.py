@@ -5,7 +5,7 @@ import json
 import sys
 from pathlib import Path
 
-from paradigm_governance.engine import config_to_toml, discover_dependencies, generate_config, generate_full_config, populate_dependencies, run_governance, run_governance_diff
+from code_governance.engine import config_to_toml, discover_dependencies, generate_config, generate_full_config, populate_dependencies, run_governance, run_governance_diff
 
 
 def main():
@@ -254,8 +254,8 @@ def _handle_check(args):
 
 
 def _handle_advise(args, report=None):
-    from paradigm_governance.advisor import generate_advice
-    from paradigm_governance.advisor.providers import ConfigError
+    from code_governance.advisor import generate_advice
+    from code_governance.advisor.providers import ConfigError
 
     config_path = Path(args.config)
     try:

@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 
 import httpx
 
-from paradigm_governance.advisor.schemas import AdviceReport
+from code_governance.advisor.schemas import AdviceReport
 
 DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-20250514"
 DEFAULT_OPENAI_MODEL = "gpt-4o"

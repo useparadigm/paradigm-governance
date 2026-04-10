@@ -26,7 +26,7 @@ inputs:
     required: false
     default: "false"
   version:
-    description: "paradigm-governance version to install"
+    description: "code-governance version to install"
     required: false
     default: ""
   python-version:
@@ -53,13 +53,13 @@ runs:
       with:
         python-version: ${{ inputs.python-version }}
 
-    - name: Install paradigm-governance
+    - name: Install code-governance
       shell: bash
       run: |
         if [ -n "${{ inputs.version }}" ]; then
-          pip install "paradigm-governance==${{ inputs.version }}"
+          pip install "code-governance==${{ inputs.version }}"
         else
-          pip install paradigm-governance
+          pip install code-governance
         fi
 
     - name: Run governance report

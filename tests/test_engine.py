@@ -1,4 +1,4 @@
-from paradigm_governance.engine import (
+from code_governance.engine import (
     discover_dependencies,
     generate_config,
     run_governance,

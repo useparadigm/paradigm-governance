@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from paradigm_governance.config import load_config
-from paradigm_governance.dep_graph import build_dependency_graph
-from paradigm_governance.extractor import extract_directory
-from paradigm_governance.rules import ALL_RULES, compute_module_metrics
-from paradigm_governance.schemas import (
+from code_governance.config import load_config
+from code_governance.dep_graph import build_dependency_graph
+from code_governance.extractor import extract_directory
+from code_governance.rules import ALL_RULES, compute_module_metrics
+from code_governance.schemas import (
     DependencyTarget,
     DiscoverReport,
     GovernanceConfig,
@@ -206,7 +206,7 @@ def generate_config(
     source_root: str | Path,
     language: str = "python",
 ) -> GovernanceConfig:
-    from paradigm_governance.schemas import Language, ModuleConfig
+    from code_governance.schemas import Language, ModuleConfig
 
     root = Path(source_root)
     if not root.exists():
@@ -254,7 +254,7 @@ def generate_full_config(
     language: str = "python",
     config_path: str | Path = "governance.toml",
 ) -> GovernanceConfig:
-    from paradigm_governance.schemas import RulesConfig
+    from code_governance.schemas import RulesConfig
 
     source_root = Path(source_root).resolve()
     config = generate_config(source_root, language)

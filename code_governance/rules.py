@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
-from paradigm_governance.dep_graph import DependencyGraph
-from paradigm_governance.schemas import (
+from code_governance.dep_graph import DependencyGraph
+from code_governance.schemas import (
     EdgeDetail,
     GovernanceConfig,
     ModuleMetrics,

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 SYSTEM_PROMPT = """\
-You are an architecture advisor for a Python codebase that uses paradigm-governance \
+You are an architecture advisor for a Python codebase that uses code-governance \
 to enforce module boundaries and architecture rules.
 
 ## Concepts

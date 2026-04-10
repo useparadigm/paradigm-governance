@@ -6,25 +6,25 @@ from unittest.mock import patch
 
 import pytest
 
-from paradigm_governance.advisor.context import (
+from code_governance.advisor.context import (
     build_context,
     _find_new_modules,
     _get_source_snippet,
 )
-from paradigm_governance.advisor.prompts import SYSTEM_PROMPT, build_user_prompt
-from paradigm_governance.advisor.providers import (
+from code_governance.advisor.prompts import SYSTEM_PROMPT, build_user_prompt
+from code_governance.advisor.providers import (
     AnthropicProvider,
     ConfigError,
     OpenAIProvider,
     get_provider,
 )
-from paradigm_governance.advisor.schemas import (
+from code_governance.advisor.schemas import (
     AdviceReport,
     ModulePlacementAdvice,
     ViolationAdvice,
 )
-from paradigm_governance.config import load_config
-from paradigm_governance.engine import discover_dependencies, run_governance
+from code_governance.config import load_config
+from code_governance.engine import discover_dependencies, run_governance
 
 
 # --- Schemas ---
@@ -193,7 +193,7 @@ def test_advise_flag_no_api_key(sample_config):
     import sys
 
     result = subprocess.run(
-        [sys.executable, "-m", "paradigm_governance", "--config",
+        [sys.executable, "-m", "code_governance", "--config",
          str(sample_config), "--advise"],
         capture_output=True,
         text=True,

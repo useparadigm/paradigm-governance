@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from ast_grep_py import SgNode
 
-from paradigm_governance.schemas import ClassInfo, FileExtractionResult, ImportInfo
+from code_governance.schemas import ClassInfo, FileExtractionResult, ImportInfo
 
 
 class PythonPatterns:

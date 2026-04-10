@@ -4,7 +4,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 
-from paradigm_governance.schemas import (
+from code_governance.schemas import (
     EdgeDetail,
     FileExtractionResult,
     GovernanceConfig,

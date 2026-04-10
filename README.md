@@ -1,4 +1,4 @@
-# paradigm-governance
+# code-governance
 
 **Enforce module boundaries in Python. Catch architectural violations in CI.**
 
@@ -22,12 +22,12 @@ Define allowed dependencies between modules in a `governance.toml`. Run it local
 
 Codebases rot from the inside. One "quick" import across a module boundary becomes ten, and suddenly everything depends on everything. Tests break for no reason, refactors are impossible, and new developers can't tell where one module ends and another begins.
 
-`paradigm-governance` makes module boundaries explicit and enforced. Like a linter for your architecture.
+`code-governance` makes module boundaries explicit and enforced. Like a linter for your architecture.
 
 ## Install
 
 ```bash
-pip install paradigm-governance
+pip install code-governance
 ```
 
 ## 30-second setup
@@ -95,7 +95,7 @@ exclude_test_files = true
 ```yaml
 - uses: actions/checkout@v4
 - name: Governance
-  uses: useparadigm/paradigm-governance@main
+  uses: useparadigm/code-governance@main
   with:
     config: governance.toml
     diff: origin/main
@@ -138,7 +138,7 @@ To enable, add [`.github/workflows/governance-fix.yml`](#governance-fix-workflow
 
 ```yaml
 repos:
-  - repo: https://github.com/useparadigm/paradigm-governance
+  - repo: https://github.com/useparadigm/code-governance
     rev: main
     hooks:
       - id: governance-check
@@ -181,7 +181,7 @@ Analyzes your violations with an LLM and suggests whether to accept the dependen
 
 [import-linter](https://github.com/seddonym/import-linter) is the established tool for this. Here's an honest comparison:
 
-| | paradigm-governance | import-linter |
+| | code-governance | import-linter |
 |---|---|---|
 | **Setup** | `--generate` creates config from source | Manual contract definition |
 | **Config format** | TOML (governance.toml) | INI or TOML |
@@ -200,7 +200,7 @@ Analyzes your violations with an LLM and suggests whether to accept the dependen
 | **Package needs installing** | No — scans source files directly | Yes — must be importable |
 | **Agent-friendly** | Claude Code skills included | No |
 
-**Choose import-linter if** you need transitive import detection or forbidden contracts. **Choose paradigm-governance if** you want CI integration, auto-fix, LLM advice, metrics, or zero-config setup.
+**Choose import-linter if** you need transitive import detection or forbidden contracts. **Choose code-governance if** you want CI integration, auto-fix, LLM advice, metrics, or zero-config setup.
 
 ## Agent-friendly
 
@@ -269,7 +269,7 @@ jobs:
           CONFIG_PATH=$(echo "$DECODED" | python3 -c "import sys,json; print(json.load(sys.stdin)['config_path'])")
           echo "$DECODED" | python3 -c "import sys,json; print(json.load(sys.stdin)['updated_config'])" > "$CONFIG_PATH"
 
-          pip install paradigm-governance
+          pip install code-governance
           governance-ast --config "$CONFIG_PATH" --fix-deps || true
 
           git config user.name "github-actions[bot]"

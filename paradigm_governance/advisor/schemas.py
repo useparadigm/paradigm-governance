@@ -28,41 +28,25 @@ class AdviceReport(BaseModel):
     summary: str = ""
 
     def to_markdown(self) -> str:
-        lines = ["## AI Architecture Advice", ""]
+        lines = []
+        effort_icon = {"trivial": "🟢", "small": "🟡", "medium": "🟠", "large": "🔴"}
+        action_icon = {"accept": "✅", "restructure": "🔧", "extract_shared_module": "📦"}
 
         if self.summary:
-            lines.append(self.summary)
+            lines.append(f"**🤖 AI:** {self.summary}")
             lines.append("")
 
-        if self.violation_advice:
-            lines.append("### Violation Recommendations")
-            lines.append("")
-            for va in self.violation_advice:
-                effort_icon = {"trivial": "🟢", "small": "🟡", "medium": "🟠", "large": "🔴"}
-                icon = effort_icon.get(va.effort_estimate, "⚪")
-                action_label = va.recommended_action.replace("_", " ").title()
-                lines.append(f"**#{va.violation_id + 1}** — {action_label} {icon} `{va.effort_estimate}`")
-                lines.append("")
-                lines.append(f"**Risk:** {va.risk_assessment}")
-                lines.append("")
-                lines.append(f"**Action:** {va.action_detail}")
-                if va.suggested_depends_on is not None:
-                    deps = ", ".join(f'`{d}`' for d in va.suggested_depends_on)
-                    lines.append(f"\n**Suggested `depends_on`:** [{deps}]")
-                lines.append("")
+        for va in self.violation_advice:
+            e = effort_icon.get(va.effort_estimate, "⚪")
+            a = action_icon.get(va.recommended_action, "💡")
+            deps = ""
+            if va.suggested_depends_on is not None:
+                deps = f" → `depends_on: {va.suggested_depends_on}`"
+            lines.append(f"{a} **#{va.violation_id + 1}** {va.action_detail}{deps} {e}")
 
-        if self.module_advice:
-            lines.append("### New Module Recommendations")
-            lines.append("")
-            for ma in self.module_advice:
-                lines.append(f"**`{ma.module_name}`**")
-                lines.append("")
-                if ma.recommended_layer:
-                    lines.append(f"- **Layer:** `{ma.recommended_layer}`")
-                if ma.recommended_depends_on:
-                    deps = ", ".join(f'`{d}`' for d in ma.recommended_depends_on)
-                    lines.append(f"- **depends_on:** [{deps}]")
-                lines.append(f"- **Rationale:** {ma.architectural_rationale}")
-                lines.append("")
+        for ma in self.module_advice:
+            deps = ", ".join(f"`{d}`" for d in ma.recommended_depends_on) if ma.recommended_depends_on else "none"
+            layer = f"layer=`{ma.recommended_layer}` " if ma.recommended_layer else ""
+            lines.append(f"📦 **`{ma.module_name}`**: {layer}depends_on=[{deps}]. {ma.architectural_rationale}")
 
         return "\n".join(lines)

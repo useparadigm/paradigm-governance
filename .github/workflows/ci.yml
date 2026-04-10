@@ -23,3 +23,6 @@ jobs:
 
       - name: Run tests
         run: uv run --python ${{ matrix.python-version }} --extra dev pytest tests/ -v
+
+      - name: Run governance check (dogfood)
+        run: uv run --python ${{ matrix.python-version }} governance-ast

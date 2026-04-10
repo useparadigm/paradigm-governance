@@ -1,0 +1,31 @@
+[governance]
+root = "paradigm_governance"
+language = "python"
+
+[[modules]]
+name = "core"
+path = "."
+depends_on = ["languages"]
+layer = "engine"
+
+[[modules]]
+name = "languages"
+path = "languages/"
+depends_on = ["core"]
+layer = "languages"
+
+[[modules]]
+name = "viewer"
+path = "viewer/"
+depends_on = []
+layer = "viewer"
+
+[layers]
+order = []
+
+[rules]
+no_cycles = true
+enforce_layers = false
+enforce_depends_on = true
+exclude_test_files = true
+exclude_from_cycles = ["core", "languages"]

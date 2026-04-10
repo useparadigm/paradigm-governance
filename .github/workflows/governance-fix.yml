@@ -2,7 +2,7 @@ name: Governance Fix
 
 on:
   issue_comment:
-    types: [edited]
+    types: [created]
 
 permissions:
   contents: write
@@ -14,12 +14,16 @@ jobs:
     runs-on: ubuntu-latest
     if: |
       github.event.issue.pull_request &&
-      contains(github.event.comment.body, '<!-- governance-fix:') &&
-      contains(github.event.comment.body, '- [x]') &&
-      !contains(github.event.comment.body, 'Config fix applied')
+      contains(github.event.comment.body, '/governance fix')
     steps:
-      - uses: actions/checkout@v4
+      - name: Acknowledge
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions \
+            -X POST -f content=eyes
 
+      - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
 
       - name: Checkout PR branch
@@ -27,32 +31,38 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh pr checkout ${{ github.event.issue.number }}
 
-      - name: Extract and apply config fix
-        id: fix
+      - name: Find governance comment and extract payload
+        id: payload
         env:
           GH_TOKEN: ${{ github.token }}
-          COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
-          # Extract base64 payload from HTML comment
-          PAYLOAD=$(echo "$COMMENT_BODY" | grep -oP '<!-- governance-fix:\K[A-Za-z0-9+/=]+' || true)
+          # Find the governance comment with the fix payload
+          PAYLOAD=$(gh api repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
+            --jq '.[] | select(.body | contains("<!-- governance-fix:")) | .body' \
+            | grep -oP '<!-- governance-fix:\K[A-Za-z0-9+/=]+' | tail -1)
 
           if [ -z "$PAYLOAD" ]; then
-            echo "No payload found in comment"
+            echo "No governance fix payload found on this PR"
+            gh api repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions \
+              -X POST -f content=confused
             exit 1
           fi
 
-          # Decode payload
-          DECODED=$(echo "$PAYLOAD" | base64 -d)
+          echo "payload=$PAYLOAD" >> $GITHUB_OUTPUT
+
+      - name: Apply config fix
+        id: fix
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          DECODED=$(echo "${{ steps.payload.outputs.payload }}" | base64 -d)
           CONFIG_PATH=$(echo "$DECODED" | python3 -c "import sys,json; print(json.load(sys.stdin)['config_path'])")
           CONFIG_CONTENT=$(echo "$DECODED" | python3 -c "import sys,json; print(json.load(sys.stdin)['updated_config'])")
 
-          # Write updated config
           echo "$CONFIG_CONTENT" > "$CONFIG_PATH"
 
-          # Auto-populate depends_on from actual imports
           uv run governance-ast --config "$CONFIG_PATH" --fix-deps || true
 
-          # Commit and push
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
@@ -67,35 +77,20 @@ jobs:
 
           echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
-      - name: Update comment
+      - name: React success
         if: steps.fix.outputs.sha
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          SHA="${{ steps.fix.outputs.sha }}"
+          gh api repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions \
+            -X POST -f content='+1'
+          gh pr comment ${{ github.event.issue.number }} \
+            --body "✅ Config fix applied in \`${{ steps.fix.outputs.sha }}\`. Governance will re-run."
 
-          # Replace checkbox with applied status
-          python3 -c "
-          import os, json
-          body = os.environ['COMMENT_BODY']
-          body = body.replace('- [x] 🔧 Apply config fix', '- [x] 🔧 Config fix applied in \`${SHA}\`')
-          # Escape for JSON
-          print(json.dumps(body))
-          " | xargs -0 -I{} gh api repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }} \
-            -X PATCH -f body={}
-        env:
-          COMMENT_BODY: ${{ github.event.comment.body }}
-
-      - name: Update comment on failure
+      - name: React failure
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
-          COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
-          python3 -c "
-          import os, json
-          body = os.environ['COMMENT_BODY']
-          body = body.replace('- [x] 🔧 Apply config fix', '- [x] ⚠️ Config fix failed — apply manually')
-          print(json.dumps(body))
-          " | xargs -0 -I{} gh api repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }} \
-            -X PATCH -f body={}
+          gh api repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions \
+            -X POST -f content=confused

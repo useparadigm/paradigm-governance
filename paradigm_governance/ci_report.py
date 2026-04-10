@@ -112,7 +112,7 @@ def generate_ci_report(
 
         updated_config = _suggest_config_update(config, new_modules)
         lines.append("")
-        lines.append("- [ ] 🔧 Apply config fix")
+        lines.append("Reply `/governance fix` to apply.")
         lines.append("")
         lines.append("<details>")
         lines.append("<summary>Config changes</summary>")

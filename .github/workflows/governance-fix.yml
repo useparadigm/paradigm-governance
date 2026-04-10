@@ -18,6 +18,13 @@ jobs:
       contains(github.event.comment.body, '- [x]') &&
       !contains(github.event.comment.body, 'Config fix applied')
     steps:
+      - name: Acknowledge
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions \
+            -X POST -f content=eyes
+
       - uses: actions/checkout@v4
 
       - uses: astral-sh/setup-uv@v4
@@ -66,6 +73,14 @@ jobs:
           git push
 
           echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: React success
+        if: steps.fix.outputs.sha
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions \
+            -X POST -f content='+1'
 
       - name: Update comment
         if: steps.fix.outputs.sha

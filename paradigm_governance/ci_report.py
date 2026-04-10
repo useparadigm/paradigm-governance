@@ -1,6 +1,7 @@
 """Generate terse CI reports for PR comments."""
 from __future__ import annotations
 
+import base64
 import json
 from pathlib import Path
 
@@ -103,7 +104,7 @@ def generate_ci_report(
             lines.append(_format_violation(v))
         lines.append("")
 
-    # New modules — compact
+    # New modules — compact with checkbox fix
     updated_config = None
     if new_modules:
         for mod in new_modules:
@@ -111,8 +112,10 @@ def generate_ci_report(
 
         updated_config = _suggest_config_update(config, new_modules)
         lines.append("")
+        lines.append("- [ ] 🔧 Apply config fix")
+        lines.append("")
         lines.append("<details>")
-        lines.append("<summary>Add to config</summary>")
+        lines.append("<summary>Config changes</summary>")
         lines.append("")
         lines.append("```toml")
         for mod in new_modules:
@@ -121,9 +124,17 @@ def generate_ci_report(
             lines.append(f'path = "{mod["path"]}"')
             lines.append(f'depends_on = []')
         lines.append("```")
-        lines.append("Then run `governance-ast --fix-deps` to populate dependencies.")
+        lines.append("`depends_on` will be auto-populated from actual imports.")
         lines.append("</details>")
         lines.append("")
+
+        # Embed payload for the fix workflow
+        payload = json.dumps({
+            "config_path": str(config_path),
+            "updated_config": updated_config,
+        })
+        encoded = base64.b64encode(payload.encode()).decode()
+        lines.append(f"<!-- governance-fix:{encoded} -->")
 
     # LLM advice — compact
     advice_data = None

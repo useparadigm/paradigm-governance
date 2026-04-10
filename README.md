@@ -1,8 +1,28 @@
 # paradigm-governance
 
-AST-based governance engine for enforcing module boundaries and architecture rules in Python codebases. Think [import-linter](https://github.com/seddonym/import-linter) but powered by [ast-grep](https://ast-grep.github.io/) for fast, accurate parsing.
+**Enforce module boundaries in Python. Catch architectural violations in CI.**
 
-Define your modules and allowed dependencies in a `governance.toml` file, then run checks in CI or locally. Detects circular dependencies, undeclared imports across module boundaries, layer violations, and reports module health metrics.
+```
+$ governance-ast
+Governance Report (python)
+Modules: 5 | Files scanned: 47
+
+Violations (2):
+  [E] [enforce_depends_on] Undeclared dependency: 'api' imports 'billing' (allowed: ['core', 'auth'])
+      api/checkout.py:3    from billing.stripe import charge_customer
+  [E] [no_cycles] Circular dependency: payments -> notifications -> payments
+      payments/process.py:1    from notifications.email import send_receipt
+
+FAILED
+```
+
+Define allowed dependencies between modules in a `governance.toml`. Run it locally, in CI, or let an LLM tell you what to fix.
+
+## Why
+
+Codebases rot from the inside. One "quick" import across a module boundary becomes ten, and suddenly everything depends on everything. Tests break for no reason, refactors are impossible, and new developers can't tell where one module ends and another begins.
+
+`paradigm-governance` makes module boundaries explicit and enforced. Like a linter for your architecture.
 
 ## Install
 
@@ -10,25 +30,20 @@ Define your modules and allowed dependencies in a `governance.toml` file, then r
 pip install paradigm-governance
 ```
 
-## Quick Start
+## 30-second setup
 
 ```bash
-# Generate config from your project structure + real imports
+# Generate config from your project — detects modules, maps real imports
 governance-ast --generate --source-root src/
 
-# Run governance checks
-governance-ast
-
-# Discover dependencies (no enforcement)
+# See what you've got
 governance-ast --discover
 
-# Interactive HTML report
-governance-ast --format html > report.html
+# Enforce it
+governance-ast
 ```
 
-The HTML report is a self-contained file with a dependency matrix (modules × modules heatmap, cycles highlighted) and a module detail view (metrics, dependencies, violations). You can also drop any governance JSON report into it.
-
-## Config
+This creates a `governance.toml`:
 
 ```toml
 [governance]
@@ -38,7 +53,7 @@ language = "python"
 [[modules]]
 name = "api"
 path = "api/"
-depends_on = ["core", "db"]
+depends_on = ["core", "auth"]
 layer = "presentation"
 
 [[modules]]
@@ -48,8 +63,8 @@ depends_on = []
 layer = "domain"
 
 [[modules]]
-name = "db"
-path = "db/"
+name = "auth"
+path = "auth/"
 depends_on = ["core"]
 layer = "infrastructure"
 
@@ -63,15 +78,15 @@ enforce_depends_on = true
 exclude_test_files = true
 ```
 
-### Rules
+## What it catches
 
-| Rule | Description |
+| Rule | What it does |
 |------|-------------|
-| `no_cycles` | Detect circular dependencies between modules |
-| `enforce_depends_on` | Flag imports not listed in `depends_on` |
-| `enforce_layers` | Prevent lower layers importing higher ones |
-| `max_public_surface` | Warn if too many symbols are used externally (float threshold) |
-| `min_cohesion` | Warn if internal-to-total import ratio is too low (float threshold) |
+| `enforce_depends_on` | Module imports something not in its `depends_on` list |
+| `no_cycles` | A imports B imports A |
+| `enforce_layers` | Lower layer imports from a higher one |
+| `max_public_surface` | Too many symbols exposed to other modules (float threshold) |
+| `min_cohesion` | Module imports more externally than internally (float threshold) |
 
 ## CI
 
@@ -83,16 +98,16 @@ exclude_test_files = true
   uses: useparadigm/paradigm-governance@main
   with:
     config: governance.toml
-    diff: origin/main          # only check changed files
-    advise: true               # LLM architectural advice
+    diff: origin/main
+    advise: true
   env:
-    OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}  # or ANTHROPIC_API_KEY
+    OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 ```
 
-This posts a comment on your PR:
+Posts a comment on your PR:
 
 ```
-## ❌ Governance — 1 violation, 1 new module
+❌ Governance — 1 violation, 1 new module
 
 🔴 🔗 core: Undeclared dependency: 'core' imports 'db' (allowed: [])
   core/service.py:2
@@ -105,26 +120,77 @@ Reply /governance fix to apply.
 types into a common module, or add "db" to core's depends_on.
 ```
 
-All inputs:
-
 | Input | Description | Default |
 |-------|-------------|---------|
 | `config` | Path to `governance.toml` | `governance.toml` |
 | `diff` | Only check files changed since this ref | — |
 | `baseline` | Path to baseline JSON | — |
-| `advise` | LLM advice (needs API key in env) | `false` |
+| `advise` | LLM architectural advice (needs API key) | `false` |
 | `comment` | Post PR comment | `true` |
 
-### `/governance fix` command
+### `/governance fix`
 
-When the governance comment detects new modules, reply `/governance fix` on the PR to auto-apply the config update. The bot:
+When new modules are detected, reply `/governance fix` on the PR. The bot adds them to `governance.toml` with `depends_on` auto-populated from actual imports, and commits to your branch.
 
-1. Reacts 👀 (acknowledged)
-2. Adds new modules to `governance.toml` with `depends_on` populated from actual imports
-3. Commits to your PR branch
-4. Reacts 👍 and confirms
+To enable, add [`.github/workflows/governance-fix.yml`](#governance-fix-workflow) to your repo.
 
-To enable this, add `.github/workflows/governance-fix.yml` to your repo:
+### Pre-commit
+
+```yaml
+repos:
+  - repo: https://github.com/useparadigm/paradigm-governance
+    rev: main
+    hooks:
+      - id: governance-check
+      - id: governance-diff   # only changed files
+```
+
+### Baseline workflow
+
+Adopting on an existing codebase? Accept current violations, only fail on new ones:
+
+```bash
+governance-ast --save-baseline .governance-baseline.json
+governance-ast --baseline .governance-baseline.json
+```
+
+## HTML report
+
+```bash
+governance-ast --format html > report.html
+```
+
+Self-contained file with a dependency matrix (modules x modules heatmap, cycles highlighted) and module detail view. Also works as a standalone viewer — drop any governance JSON into it.
+
+## LLM advice
+
+```bash
+export OPENAI_API_KEY=sk-...   # or ANTHROPIC_API_KEY
+governance-ast --advise
+```
+
+Analyzes your violations with an LLM and suggests whether to accept the dependency, restructure the code, or extract a shared module. Works with OpenAI and Anthropic.
+
+| Env var | Description |
+|---------|-------------|
+| `OPENAI_API_KEY` | OpenAI (default: gpt-4o) |
+| `ANTHROPIC_API_KEY` | Anthropic (default: claude-sonnet-4-20250514) |
+| `GOVERNANCE_LLM_MODEL` | Override model |
+
+## Agent-friendly
+
+Ships with Claude Code skills in `.claude/skills/` that teach AI coding agents how to run checks, interpret violations, and generate configs.
+
+---
+
+## Appendix
+
+### Governance fix workflow
+
+Add this to `.github/workflows/governance-fix.yml` to enable the `/governance fix` command:
+
+<details>
+<summary>governance-fix.yml</summary>
 
 ```yaml
 name: Governance Fix
@@ -153,7 +219,6 @@ jobs:
             -X POST -f content=eyes
 
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
 
       - name: Checkout PR branch
         env:
@@ -202,55 +267,7 @@ jobs:
             --body "✅ Config fix applied in \`${{ steps.fix.outputs.sha }}\`. Re-run checks to verify."
 ```
 
-### Pre-commit
-
-```yaml
-repos:
-  - repo: https://github.com/useparadigm/paradigm-governance
-    rev: main
-    hooks:
-      - id: governance-check
-      # or
-      - id: governance-diff   # only changed files
-```
-
-### CLI in CI
-
-```bash
-governance-ast --diff origin/main
-```
-
-### Baseline workflow
-
-```bash
-# Save current violations as accepted
-governance-ast --save-baseline .governance-baseline.json
-
-# Only fail on new violations
-governance-ast --baseline .governance-baseline.json
-```
-
-## LLM Advice
-
-`--advise` calls an LLM to analyze violations and suggest fixes:
-
-```bash
-export OPENAI_API_KEY=sk-...   # or ANTHROPIC_API_KEY
-governance-ast --advise
-```
-
-Supports OpenAI and Anthropic. Configure with env vars:
-
-| Env var | Description |
-|---------|-------------|
-| `OPENAI_API_KEY` | Use OpenAI (default model: gpt-4o) |
-| `ANTHROPIC_API_KEY` | Use Anthropic (default model: claude-sonnet-4-20250514) |
-| `GOVERNANCE_LLM_PROVIDER` | Override: `openai` or `anthropic` |
-| `GOVERNANCE_LLM_MODEL` | Override model name |
-
-## Agent-Friendly
-
-Ships with Claude Code skills in `.claude/skills/` that teach AI agents how to use the CLI and generate configs. See `governance.md` and `governance-config.md`.
+</details>
 
 ## License
 

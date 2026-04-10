@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from ast_grep_py import SgRoot
@@ -34,7 +35,8 @@ def extract_directory(
                 source = file_path.read_text(encoding="utf-8", errors="replace")
                 result = extract_file(rel_path, source, language)
                 results.append(result)
-            except Exception:
+            except Exception as e:
+                print(f"Warning: failed to parse {file_path}: {e}", file=sys.stderr)
                 continue
 
     return results
@@ -44,11 +46,6 @@ _TEST_DIR_SEGMENTS = {"tests", "test", "__tests__"}
 
 _TEST_FILE_PATTERNS: dict[Language, list[tuple[str, str]]] = {
     Language.PYTHON: [("test_", ""), ("", "_test.py"), ("conftest.py", "")],
-    Language.TYPESCRIPT: [
-        ("", ".test.ts"), ("", ".test.tsx"),
-        ("", ".spec.ts"), ("", ".spec.tsx"),
-    ],
-    Language.CSHARP: [("", "Tests.cs"), ("", "Test.cs")],
 }
 
 

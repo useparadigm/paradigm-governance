@@ -135,14 +135,8 @@ def _build_importable_map(
 
 def _file_to_dotted(file_path: str, config: GovernanceConfig) -> str | None:
     p = PurePosixPath(file_path)
-    if p.suffix in (".py",):
-        stem = str(p.with_suffix("")).replace("/", ".")
-        return stem
-    elif p.suffix in (".ts", ".tsx", ".js", ".jsx"):
-        stem = str(p.with_suffix("")).replace("/", ".")
-        return stem
-    elif p.suffix in (".cs",):
-        return None
+    if p.suffix == ".py":
+        return str(p.with_suffix("")).replace("/", ".")
     return None
 
 
@@ -153,13 +147,7 @@ def _resolve_import_to_module(
     importable_map: dict[str, str],
     module_files: dict[str, str],
 ) -> str | None:
-    if config.language.value == "python":
-        return _resolve_python_import(import_source, importing_file, config, importable_map, module_files)
-    elif config.language.value == "typescript":
-        return _resolve_ts_import(import_source, importing_file, config, module_files)
-    elif config.language.value == "csharp":
-        return _resolve_csharp_import(import_source, config)
-    return None
+    return _resolve_python_import(import_source, importing_file, config, importable_map, module_files)
 
 
 def _resolve_python_import(
@@ -217,46 +205,3 @@ def _resolve_relative_import(import_source: str, importing_file: str) -> str | N
     return ".".join(base_parts)
 
 
-def _resolve_ts_import(
-    import_source: str,
-    importing_file: str,
-    config: GovernanceConfig,
-    module_files: dict[str, str],
-) -> str | None:
-    if not import_source.startswith("."):
-        return None
-
-    importing_dir = str(PurePosixPath(importing_file).parent)
-    resolved = str(PurePosixPath(importing_dir) / import_source)
-    resolved = _normalize_path(resolved)
-
-    for mod_name, mod_path in module_files.items():
-        mod_path_clean = mod_path.rstrip("/")
-        if resolved.startswith(mod_path_clean + "/") or resolved == mod_path_clean:
-            return mod_name
-
-    return None
-
-
-def _resolve_csharp_import(
-    import_source: str,
-    config: GovernanceConfig,
-) -> str | None:
-    for mod in config.modules:
-        if (
-            import_source == mod.name
-            or import_source.startswith(mod.name + ".")
-        ):
-            return mod.name
-    return None
-
-
-def _normalize_path(path: str) -> str:
-    parts: list[str] = []
-    for part in path.split("/"):
-        if part == "..":
-            if parts:
-                parts.pop()
-        elif part != ".":
-            parts.append(part)
-    return "/".join(parts)

@@ -199,8 +199,6 @@ def config_to_toml(config: GovernanceConfig) -> str:
 _SKIP_DIRS = {"node_modules", "__pycache__", ".git", "venv", ".venv"}
 _LANG_EXTENSIONS = {
     "python": {".py"},
-    "typescript": {".ts", ".tsx", ".js", ".jsx"},
-    "csharp": {".cs"},
 }
 
 

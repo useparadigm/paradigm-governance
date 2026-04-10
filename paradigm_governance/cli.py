@@ -71,7 +71,7 @@ def main():
     parser.add_argument(
         "--language",
         default="python",
-        choices=["python", "typescript", "csharp"],
+        choices=["python"],
         help="Language for --fix-config / --generate (default: python)",
     )
 

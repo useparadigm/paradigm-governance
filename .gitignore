@@ -6,3 +6,5 @@ build/
 .venv/
 .env
 *.toml.bak
+.pytest_cache/
+.governance-baseline.json

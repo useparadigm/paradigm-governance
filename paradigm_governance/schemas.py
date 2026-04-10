@@ -9,8 +9,6 @@ from pydantic import BaseModel
 
 class Language(str, Enum):
     PYTHON = "python"
-    TYPESCRIPT = "typescript"
-    CSHARP = "csharp"
 
 
 class Severity(str, Enum):

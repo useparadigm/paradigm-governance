@@ -5,8 +5,6 @@ import json
 import sys
 from pathlib import Path
 
-import tomllib
-
 from paradigm_governance.engine import config_to_toml, discover_dependencies, generate_config, generate_full_config, populate_dependencies, run_governance, run_governance_diff
 
 

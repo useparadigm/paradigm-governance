@@ -6,11 +6,54 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   check:
     name: Governance
     runs-on: ubuntu-latest
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
-      - run: uv run governance-ast
+
+      - name: Run governance check
+        id: governance
+        run: |
+          set +e
+          uv run governance-ci-report --config governance.toml --json --advise > /tmp/report.json 2>/tmp/advice-log.txt
+          exit_code=$?
+          set -e
+
+          cat /tmp/advice-log.txt >&2
+
+          passed=$(python3 -c "import json; d=json.load(open('/tmp/report.json')); print('true' if d['passed'] else 'false')" 2>/dev/null || echo "false")
+          violations=$(python3 -c "import json; d=json.load(open('/tmp/report.json')); print(len(d['violations']))" 2>/dev/null || echo "0")
+          markdown=$(python3 -c "import json; d=json.load(open('/tmp/report.json')); print(d['markdown'])" 2>/dev/null || echo "Governance check failed.")
+
+          echo "passed=$passed" >> $GITHUB_OUTPUT
+          echo "violations=$violations" >> $GITHUB_OUTPUT
+          echo "$markdown" > /tmp/governance-comment.md
+
+          echo "$markdown"
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Delete previous governance comment if exists
+          comment_id=$(gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
+            --jq '.[] | select(.body | startswith("## Governance Report")) | .id' 2>/dev/null | head -1)
+          if [ -n "$comment_id" ]; then
+            gh api repos/${{ github.repository }}/issues/comments/$comment_id -X DELETE 2>/dev/null || true
+          fi
+
+          gh pr comment ${{ github.event.pull_request.number }} --body-file /tmp/governance-comment.md
+
+      - name: Fail if violations
+        if: steps.governance.outputs.passed == 'false'
+        run: exit 1

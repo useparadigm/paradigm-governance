@@ -1,0 +1,101 @@
+name: Governance Fix
+
+on:
+  issue_comment:
+    types: [edited]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  apply-fix:
+    name: Apply config fix
+    runs-on: ubuntu-latest
+    if: |
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '<!-- governance-fix:') &&
+      contains(github.event.comment.body, '- [x]') &&
+      !contains(github.event.comment.body, 'Config fix applied')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v4
+
+      - name: Checkout PR branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr checkout ${{ github.event.issue.number }}
+
+      - name: Extract and apply config fix
+        id: fix
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          # Extract base64 payload from HTML comment
+          PAYLOAD=$(echo "$COMMENT_BODY" | grep -oP '<!-- governance-fix:\K[A-Za-z0-9+/=]+' || true)
+
+          if [ -z "$PAYLOAD" ]; then
+            echo "No payload found in comment"
+            exit 1
+          fi
+
+          # Decode payload
+          DECODED=$(echo "$PAYLOAD" | base64 -d)
+          CONFIG_PATH=$(echo "$DECODED" | python3 -c "import sys,json; print(json.load(sys.stdin)['config_path'])")
+          CONFIG_CONTENT=$(echo "$DECODED" | python3 -c "import sys,json; print(json.load(sys.stdin)['updated_config'])")
+
+          # Write updated config
+          echo "$CONFIG_CONTENT" > "$CONFIG_PATH"
+
+          # Auto-populate depends_on from actual imports
+          uv run governance-ast --config "$CONFIG_PATH" --fix-deps || true
+
+          # Commit and push
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add "$CONFIG_PATH"
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          git commit -m "governance: add new modules to config"
+          git push
+
+          echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Update comment
+        if: steps.fix.outputs.sha
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHA="${{ steps.fix.outputs.sha }}"
+
+          # Replace checkbox with applied status
+          python3 -c "
+          import os, json
+          body = os.environ['COMMENT_BODY']
+          body = body.replace('- [x] 🔧 Apply config fix', '- [x] 🔧 Config fix applied in \`${SHA}\`')
+          # Escape for JSON
+          print(json.dumps(body))
+          " | xargs -0 -I{} gh api repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }} \
+            -X PATCH -f body={}
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+
+      - name: Update comment on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          python3 -c "
+          import os, json
+          body = os.environ['COMMENT_BODY']
+          body = body.replace('- [x] 🔧 Apply config fix', '- [x] ⚠️ Config fix failed — apply manually')
+          print(json.dumps(body))
+          " | xargs -0 -I{} gh api repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }} \
+            -X PATCH -f body={}

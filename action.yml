@@ -17,10 +17,14 @@ inputs:
     description: "Path to baseline JSON file — only report new violations"
     required: false
     default: ""
-  format:
-    description: "Output format: text or json"
+  auto-update-config:
+    description: "Automatically commit config updates when new modules are detected"
     required: false
-    default: "text"
+    default: "true"
+  comment:
+    description: "Post a PR comment with the governance report"
+    required: false
+    default: "true"
   version:
     description: "paradigm-governance version to install"
     required: false
@@ -33,13 +37,13 @@ inputs:
 outputs:
   passed:
     description: "Whether governance checks passed (true/false)"
-    value: ${{ steps.run.outputs.passed }}
+    value: ${{ steps.report.outputs.passed }}
   violations:
     description: "Number of violations found"
-    value: ${{ steps.run.outputs.violations }}
-  report:
-    description: "Full governance report output"
-    value: ${{ steps.run.outputs.report }}
+    value: ${{ steps.report.outputs.violations }}
+  new-modules:
+    description: "Number of new modules detected"
+    value: ${{ steps.report.outputs.new_modules }}
 
 runs:
   using: "composite"
@@ -58,38 +62,87 @@ runs:
           pip install paradigm-governance
         fi
 
-    - name: Run governance checks
-      id: run
+    - name: Run governance report
+      id: report
       shell: bash
       run: |
-        args="--config ${{ inputs.config }} --format ${{ inputs.format }}"
-
-        if [ -n "${{ inputs.diff }}" ]; then
-          args="$args --diff ${{ inputs.diff }}"
-        fi
-
-        if [ -n "${{ inputs.baseline }}" ]; then
-          args="$args --baseline ${{ inputs.baseline }}"
-        fi
-
         set +e
-        output=$(governance-ast $args 2>&1)
+        output=$(governance-ci-report --config "${{ inputs.config }}" --json 2>&1)
         exit_code=$?
         set -e
 
-        echo "report<<GOVERNANCE_EOF" >> $GITHUB_OUTPUT
-        echo "$output" >> $GITHUB_OUTPUT
-        echo "GOVERNANCE_EOF" >> $GITHUB_OUTPUT
+        # Parse JSON output
+        passed=$(echo "$output" | python3 -c "import sys,json; d=json.load(sys.stdin); print('true' if d['passed'] else 'false')" 2>/dev/null || echo "false")
+        violations=$(echo "$output" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d['violations']))" 2>/dev/null || echo "0")
+        new_modules=$(echo "$output" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d['new_modules']))" 2>/dev/null || echo "0")
+        markdown=$(echo "$output" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['markdown'])" 2>/dev/null || echo "Governance check failed to produce a report.")
+        updated_config=$(echo "$output" | python3 -c "import sys,json; d=json.load(sys.stdin); c=d.get('updated_config'); print(c if c else '')" 2>/dev/null || echo "")
 
-        if [ $exit_code -eq 0 ]; then
-          echo "passed=true" >> $GITHUB_OUTPUT
-          echo "violations=0" >> $GITHUB_OUTPUT
-        else
-          echo "passed=false" >> $GITHUB_OUTPUT
-          # Extract violation count from output
-          count=$(echo "$output" | grep -oP 'Violations \(\K[0-9]+' || echo "1")
-          echo "violations=$count" >> $GITHUB_OUTPUT
+        echo "passed=$passed" >> $GITHUB_OUTPUT
+        echo "violations=$violations" >> $GITHUB_OUTPUT
+        echo "new_modules=$new_modules" >> $GITHUB_OUTPUT
+
+        # Save markdown for comment step
+        echo "$markdown" > /tmp/governance-report.md
+
+        # Save updated config if present
+        if [ -n "$updated_config" ]; then
+          echo "$updated_config" > /tmp/governance-updated-config.toml
         fi
 
-        echo "$output"
-        exit $exit_code
+        # Print human-readable summary
+        echo "$markdown"
+
+    - name: Comment on PR
+      if: inputs.comment == 'true' && github.event_name == 'pull_request'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        # Delete previous governance comment if exists
+        comment_id=$(gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
+          --jq '.[] | select(.body | startswith("## Governance Report")) | .id' 2>/dev/null | head -1)
+        if [ -n "$comment_id" ]; then
+          gh api repos/${{ github.repository }}/issues/comments/$comment_id -X DELETE 2>/dev/null || true
+        fi
+
+        gh pr comment ${{ github.event.pull_request.number }} --body-file /tmp/governance-report.md
+
+    - name: Auto-update config for new modules
+      if: inputs.auto-update-config == 'true' && steps.report.outputs.new_modules != '0' && github.event_name == 'pull_request'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        if [ ! -f /tmp/governance-updated-config.toml ]; then
+          echo "No updated config to apply"
+          exit 0
+        fi
+
+        # Configure git
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+        # Copy updated config
+        cp /tmp/governance-updated-config.toml "${{ inputs.config }}"
+
+        # Auto-populate depends_on from actual imports
+        governance-ast --config "${{ inputs.config }}" --fix-deps || true
+
+        # Commit and push
+        git add "${{ inputs.config }}"
+        if git diff --cached --quiet; then
+          echo "No config changes to commit"
+        else
+          git commit -m "governance: add new modules to config
+
+        Auto-detected modules added by paradigm-governance action.
+        Run \`governance-ast --fix-deps\` to update dependencies."
+
+          git push
+        fi
+
+    - name: Fail if violations
+      if: steps.report.outputs.passed == 'false'
+      shell: bash
+      run: exit 1

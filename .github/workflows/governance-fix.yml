@@ -2,7 +2,7 @@ name: Governance Fix
 
 on:
   issue_comment:
-    types: [edited]
+    types: [edited, created]
 
 permissions:
   contents: write

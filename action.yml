@@ -1,0 +1,95 @@
+name: "Paradigm Governance"
+description: "Enforce module boundaries and architecture rules in Python codebases"
+branding:
+  icon: "shield"
+  color: "blue"
+
+inputs:
+  config:
+    description: "Path to governance.toml"
+    required: false
+    default: "governance.toml"
+  diff:
+    description: "Only check files changed since this git ref (e.g. origin/main, HEAD~1)"
+    required: false
+    default: ""
+  baseline:
+    description: "Path to baseline JSON file — only report new violations"
+    required: false
+    default: ""
+  format:
+    description: "Output format: text or json"
+    required: false
+    default: "text"
+  version:
+    description: "paradigm-governance version to install"
+    required: false
+    default: ""
+  python-version:
+    description: "Python version to use"
+    required: false
+    default: "3.12"
+
+outputs:
+  passed:
+    description: "Whether governance checks passed (true/false)"
+    value: ${{ steps.run.outputs.passed }}
+  violations:
+    description: "Number of violations found"
+    value: ${{ steps.run.outputs.violations }}
+  report:
+    description: "Full governance report output"
+    value: ${{ steps.run.outputs.report }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install paradigm-governance
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.version }}" ]; then
+          pip install "paradigm-governance==${{ inputs.version }}"
+        else
+          pip install paradigm-governance
+        fi
+
+    - name: Run governance checks
+      id: run
+      shell: bash
+      run: |
+        args="--config ${{ inputs.config }} --format ${{ inputs.format }}"
+
+        if [ -n "${{ inputs.diff }}" ]; then
+          args="$args --diff ${{ inputs.diff }}"
+        fi
+
+        if [ -n "${{ inputs.baseline }}" ]; then
+          args="$args --baseline ${{ inputs.baseline }}"
+        fi
+
+        set +e
+        output=$(governance-ast $args 2>&1)
+        exit_code=$?
+        set -e
+
+        echo "report<<GOVERNANCE_EOF" >> $GITHUB_OUTPUT
+        echo "$output" >> $GITHUB_OUTPUT
+        echo "GOVERNANCE_EOF" >> $GITHUB_OUTPUT
+
+        if [ $exit_code -eq 0 ]; then
+          echo "passed=true" >> $GITHUB_OUTPUT
+          echo "violations=0" >> $GITHUB_OUTPUT
+        else
+          echo "passed=false" >> $GITHUB_OUTPUT
+          # Extract violation count from output
+          count=$(echo "$output" | grep -oP 'Violations \(\K[0-9]+' || echo "1")
+          echo "violations=$count" >> $GITHUB_OUTPUT
+        fi
+
+        echo "$output"
+        exit $exit_code

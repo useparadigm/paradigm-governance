@@ -1,0 +1,17 @@
+- id: governance-check
+  name: governance-check
+  description: Check module boundaries and architecture rules
+  entry: governance-ast
+  language: python
+  types: [python]
+  pass_filenames: false
+  additional_dependencies: []
+
+- id: governance-diff
+  name: governance-diff
+  description: Check governance rules only on changed files
+  entry: governance-ast --diff HEAD
+  language: python
+  types: [python]
+  pass_filenames: false
+  additional_dependencies: []

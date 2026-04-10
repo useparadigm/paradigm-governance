@@ -157,13 +157,56 @@ Combined with `--diff`, it auto-loads `.governance-baseline.json` if present:
 governance-ast --diff HEAD~1
 ```
 
-### GitHub Actions example
+### GitHub Action
+
+Use the reusable action in your workflow:
 
 ```yaml
+- uses: actions/checkout@v4
 - name: Check governance
-  run: |
-    pip install paradigm-governance
-    governance-ast --diff origin/main
+  uses: useparadigm/paradigm-governance@main
+  with:
+    config: governance.toml
+    diff: origin/main
+```
+
+With baseline:
+
+```yaml
+- uses: actions/checkout@v4
+- name: Check governance
+  uses: useparadigm/paradigm-governance@main
+  with:
+    config: governance.toml
+    diff: origin/main
+    baseline: .governance-baseline.json
+```
+
+All inputs:
+
+| Input | Description | Default |
+|-------|-------------|---------|
+| `config` | Path to `governance.toml` | `governance.toml` |
+| `diff` | Only check files changed since this ref | — |
+| `baseline` | Path to baseline JSON | — |
+| `format` | Output format (`text` or `json`) | `text` |
+| `version` | Package version to install | latest |
+| `python-version` | Python version | `3.12` |
+
+Outputs: `passed` (true/false), `violations` (count), `report` (full output).
+
+### Pre-commit
+
+Add to your `.pre-commit-config.yaml`:
+
+```yaml
+repos:
+  - repo: https://github.com/useparadigm/paradigm-governance
+    rev: main
+    hooks:
+      - id: governance-check        # full check
+      # or
+      - id: governance-diff         # only changed files
 ```
 
 ## Agent-Friendly

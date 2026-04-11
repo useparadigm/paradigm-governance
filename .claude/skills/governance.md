@@ -47,7 +47,7 @@ governance-ast --discover --format json
 
 ### Violations
 Each violation shows:
-- **Rule**: which rule was broken (`no_cycles`, `enforce_depends_on`, `enforce_layers`, `max_public_surface`, `min_cohesion`)
+- **Rule**: which rule was broken (`no_cycles`, `enforce_cannot_depend_on`, `enforce_layers`, `max_public_surface`, `min_cohesion`)
 - **Module**: the offending module
 - **Detail**: human-readable description
 - **Evidence**: file:line showing the exact import
@@ -60,11 +60,11 @@ Each violation shows:
 
 ## Fixing Violations
 
-### `enforce_depends_on` violations
-Module X imports from module Y but Y is not in X's `depends_on` list.
+### `enforce_cannot_depend_on` violations
+Module X imports from module Y but Y is in X's `cannot_depend_on` list.
 
 Options:
-1. **Add the dependency**: add Y to X's `depends_on` in governance.toml
+1. **Allow the dependency**: remove Y from X's `cannot_depend_on` in governance.toml
 2. **Move the code**: relocate the shared code to a common module both can depend on
 3. **Remove the import**: refactor to eliminate the cross-boundary import
 
@@ -104,12 +104,3 @@ git add .governance-baseline.json
 governance-ast --baseline .governance-baseline.json
 ```
 
-## Auto-populating dependencies
-
-If you have a config with modules but empty `depends_on`, auto-populate from actual imports:
-
-```bash
-governance-ast --fix-deps
-```
-
-This rewrites `governance.toml` in place with real dependency data.

@@ -46,7 +46,7 @@ def test_advice_report_to_markdown():
             ModulePlacementAdvice(
                 module_name="exporters",
                 recommended_layer="infrastructure",
-                recommended_depends_on=["core"],
+                recommended_cannot_depend_on=[],
                 architectural_rationale="Exporters are I/O-bound output modules.",
             ),
         ],
@@ -87,7 +87,7 @@ def test_build_context_source_snippets(sample_config):
 
     # Should have source snippets for violations with evidence
     for v in context["violations"]:
-        if v["rule"] == "enforce_depends_on":
+        if v["rule"] == "enforce_cannot_depend_on":
             assert len(v["source_snippets"]) > 0
             snippet = v["source_snippets"][0]
             assert "file" in snippet
@@ -118,7 +118,7 @@ def test_get_source_snippet_missing_file(sample_config):
 
 
 def test_system_prompt_has_rules():
-    assert "enforce_depends_on" in SYSTEM_PROMPT
+    assert "enforce_cannot_depend_on" in SYSTEM_PROMPT
     assert "no_cycles" in SYSTEM_PROMPT
     assert "enforce_layers" in SYSTEM_PROMPT
 

@@ -18,7 +18,7 @@
 
 | Without governance | With governance |
 |---|---|
-| `api/` imports from `billing/`, `db/`, `auth/`, `utils/`, `migrations/`... | `api/` imports from `core/`, `auth/` — nothing else allowed |
+| `api/` imports from `billing/`, `db/`, `auth/`, `utils/`, `migrations/`... | `api/` has `cannot_depend_on = ["billing", "migrations"]` — forbidden imports blocked |
 | One refactor breaks 14 files across 6 modules | Boundaries are explicit, changes stay local |
 | New dev: "Can I import this here?" "Uhh... maybe?" | Config says yes or no. CI enforces it. |
 
@@ -46,7 +46,7 @@ Then run:
 3. Shows you the dependency map: *"I found 8 modules. `api` imports from `db` directly — should it?"*
 4. You discuss architecture: which dependencies are intentional, which are spaghetti
 5. Claude creates `governance.toml` based on your answers
-6. Enables rules: `no_cycles`, `enforce_depends_on`, optionally `enforce_layers`
+6. Enables rules: `no_cycles`, `enforce_cannot_depend_on`, optionally `enforce_layers`
 7. If existing violations: *"Want a baseline? I'll accept these and only fail on new ones."*
 8. Sets up GitHub Actions — CI check on every PR + `/governance fix` command
 9. Done. Every PR is now gated on architecture rules.
@@ -109,7 +109,7 @@ See [governance-fix workflow](#governance-fix-workflow) to enable the `/governan
 
 | Rule | Example |
 |------|---------|
-| `enforce_depends_on` | `api` imports `billing` but only `core`, `auth` are allowed |
+| `enforce_cannot_depend_on` | `api` imports `billing` but `billing` is in `cannot_depend_on` |
 | `no_cycles` | `payments` -> `notifications` -> `payments` |
 | `enforce_layers` | `db` (infrastructure) imports from `api` (presentation) |
 | `max_public_surface` | 80% of `core`'s symbols used externally — too exposed |
@@ -122,7 +122,7 @@ Every PR gets a governance comment:
 ```
 ❌ Governance — 1 violation, 1 new module
 
-🔴 🔗 core: Undeclared dependency: 'core' imports 'db' (allowed: [])
+🔴 🔗 core: Forbidden dependency: 'core' imports 'db' (cannot_depend_on: ['db'])
   core/service.py:2
 
 📦 New module exporters (exporters/) — not in governance.toml
@@ -130,10 +130,10 @@ Every PR gets a governance comment:
 Reply /governance fix to apply.
 
 🤖 AI: The core→db import creates tight coupling. Extract shared
-types into a common module, or add "db" to core's depends_on.
+types into a common module, or remove "db" from core's cannot_depend_on.
 ```
 
-**New module detected?** Reply `/governance fix` — bot adds it to config with `depends_on` populated from actual imports, commits to your branch.
+**New module detected?** Reply `/governance fix` — bot adds it to config, commits to your branch.
 
 **Violation?** Fix the import or update `governance.toml`. Use `/governance-check` in Claude Code for interactive help.
 
@@ -192,7 +192,7 @@ Self-contained dependency matrix with module metrics. Drop any governance JSON i
 | **Scans source directly** | Yes | Yes | No — must be importable |
 | **Interface enforcement** | No | Yes | No |
 | **Transitive imports** | Direct only | Direct only | Full chain |
-| **Forbidden imports** | No | `cannot_depend_on` | Forbidden contract |
+| **Forbidden imports** | `cannot_depend_on` | `cannot_depend_on` | Forbidden contract |
 | **Visibility control** | No | Yes | No |
 | **Speed (Django)** | ~1.2s | Sub-second (Rust) | ~0.1s (grimp) |
 | **Config syntax** | Simple TOML lists | TOML with regex | INI or TOML |
@@ -262,7 +262,7 @@ jobs:
           echo "$DECODED" | python3 -c "import sys,json; print(json.load(sys.stdin)['updated_config'])" > "$CONFIG_PATH"
 
           pip install code-governance
-          governance-ast --config "$CONFIG_PATH" --fix-deps || true
+          echo "Config updated"
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

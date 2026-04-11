@@ -5,25 +5,25 @@ language = "python"
 [[modules]]
 name = "core"
 path = "."
-depends_on = ["languages", "advisor"]
+cannot_depend_on = []
 layer = "engine"
 
 [[modules]]
 name = "languages"
 path = "languages/"
-depends_on = ["core"]
+cannot_depend_on = []
 layer = "languages"
 
 [[modules]]
 name = "advisor"
 path = "advisor/"
-depends_on = ["core"]
+cannot_depend_on = []
 layer = "advisor"
 
 [[modules]]
 name = "viewer"
 path = "viewer/"
-depends_on = []
+cannot_depend_on = []
 layer = "viewer"
 
 [layers]
@@ -32,6 +32,6 @@ order = []
 [rules]
 no_cycles = true
 enforce_layers = false
-enforce_depends_on = true
+enforce_cannot_depend_on = true
 exclude_test_files = true
 exclude_from_cycles = ["core", "languages"]

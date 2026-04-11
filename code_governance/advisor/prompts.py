@@ -8,11 +8,11 @@ to enforce module boundaries and architecture rules.
 ## Concepts
 
 - **Modules**: Named code boundaries defined in governance.toml. Each module has a \
-directory path and a list of allowed dependencies (depends_on).
+directory path and optionally a list of forbidden dependencies (cannot_depend_on).
 - **Layers**: An ordered hierarchy from highest (e.g. API) to lowest (e.g. shared). \
 Higher layers may depend on lower layers, not vice versa.
 - **Rules**:
-  - `enforce_depends_on`: Every cross-module import must be declared in depends_on.
+  - `enforce_cannot_depend_on`: Modules cannot import from modules listed in their cannot_depend_on.
   - `no_cycles`: No circular dependency chains between modules.
   - `enforce_layers`: Lower layers cannot import from higher layers.
   - `max_public_surface`: Warns when too many symbols are used externally.
@@ -25,12 +25,12 @@ architecture. Be concrete — reference actual file paths, module names, and \
 specific refactoring steps. Avoid generic advice.
 
 For each violation, recommend one of:
-- **accept**: The dependency is intentional. Update governance.toml to allow it.
+- **accept**: The dependency should be allowed. Remove the target from cannot_depend_on.
 - **restructure**: Move or reorganize code to eliminate the dependency.
 - **extract_shared_module**: Create a new module for shared code that both modules can depend on.
 
-For new modules, recommend a layer assignment and depends_on based on what the \
-module's code actually imports.
+For new modules, recommend a layer assignment and cannot_depend_on based on what \
+architectural boundaries should be enforced.
 
 Respond with valid JSON matching the requested schema.\
 """

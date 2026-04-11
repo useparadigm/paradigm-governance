@@ -5,25 +5,25 @@ language = "python"
 [[modules]]
 name = "core"
 path = "core/"
-depends_on = []
+cannot_depend_on = ["db"]
 layer = "core"
 
 [[modules]]
 name = "db"
 path = "db/"
-depends_on = ["core"]
+cannot_depend_on = []
 layer = "db"
 
 [[modules]]
 name = "api"
 path = "api/"
-depends_on = ["core", "db", "utils"]
+cannot_depend_on = []
 layer = "api"
 
 [[modules]]
 name = "utils"
 path = "utils/"
-depends_on = []
+cannot_depend_on = []
 layer = "utils"
 
 [layers]
@@ -32,5 +32,5 @@ order = ["api", "db", "core", "utils"]
 [rules]
 no_cycles = true
 enforce_layers = true
-enforce_depends_on = true
+enforce_cannot_depend_on = true
 exclude_test_files = true

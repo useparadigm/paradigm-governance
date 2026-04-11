@@ -61,7 +61,7 @@ jobs:
 
           echo "$CONFIG_CONTENT" > "$CONFIG_PATH"
 
-          uv run governance-ast --config "$CONFIG_PATH" --fix-deps || true
+          echo "Config updated"
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

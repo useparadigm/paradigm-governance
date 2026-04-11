@@ -172,8 +172,8 @@ def config_to_toml(config: GovernanceConfig) -> str:
         lines.append("[[modules]]")
         lines.append(f'name = "{mod.name}"')
         lines.append(f'path = "{mod.path}"')
-        deps = ", ".join(f'"{d}"' for d in mod.depends_on)
-        lines.append(f"depends_on = [{deps}]")
+        deps = ", ".join(f'"{d}"' for d in mod.cannot_depend_on)
+        lines.append(f"cannot_depend_on = [{deps}]")
         if mod.layer:
             lines.append(f'layer = "{mod.layer}"')
         lines.append("")
@@ -187,7 +187,7 @@ def config_to_toml(config: GovernanceConfig) -> str:
     lines.append("[rules]")
     lines.append(f"no_cycles = {'true' if config.rules.no_cycles else 'false'}")
     lines.append(f"enforce_layers = {'true' if config.rules.enforce_layers else 'false'}")
-    lines.append(f"enforce_depends_on = {'true' if config.rules.enforce_depends_on else 'false'}")
+    lines.append(f"enforce_cannot_depend_on = {'true' if config.rules.enforce_cannot_depend_on else 'false'}")
     lines.append(f"exclude_test_files = {'true' if config.rules.exclude_test_files else 'false'}")
     if config.rules.exclude_from_cycles:
         excluded = ", ".join(f'"{e}"' for e in config.rules.exclude_from_cycles)
@@ -225,7 +225,7 @@ def generate_config(
         modules.append(ModuleConfig(
             name="core",
             path=".",
-            depends_on=[],
+            cannot_depend_on=[],
         ))
 
     for child in sorted(root.iterdir()):
@@ -239,7 +239,7 @@ def generate_config(
         modules.append(ModuleConfig(
             name=child.name,
             path=child.name + "/",
-            depends_on=[],
+            cannot_depend_on=[],
         ))
 
     return GovernanceConfig(
@@ -254,8 +254,6 @@ def generate_full_config(
     language: str = "python",
     config_path: str | Path = "governance.toml",
 ) -> GovernanceConfig:
-    from code_governance.schemas import RulesConfig
-
     source_root = Path(source_root).resolve()
     config = generate_config(source_root, language)
 
@@ -267,24 +265,6 @@ def generate_full_config(
         rel_root = source_root
     config.root = str(rel_root)
 
-    # Write temp config to run populate_dependencies
-    tmp_path = source_root.parent / f".governance-tmp-{id(config)}.toml"
-    tmp_config = config.model_copy(update={"root": source_root.name})
-    tmp_path.write_text(config_to_toml(tmp_config))
-
-    try:
-        config = populate_dependencies(tmp_path)
-    finally:
-        tmp_path.unlink(missing_ok=True)
-
-    # Mirror reality: no enforcement, just ground truth
-    config.rules = RulesConfig(
-        no_cycles=False,
-        enforce_layers=False,
-        enforce_depends_on=False,
-        exclude_test_files=True,
-    )
-    config.root = str(rel_root)
     return config
 
 
@@ -304,7 +284,7 @@ def _discover_modules_recursive(root: Path) -> list:
             modules.append(ModuleConfig(
                 name=prefix.replace("/", ".").rstrip("."),
                 path=prefix,
-                depends_on=[],
+                cannot_depend_on=[],
             ))
 
         for child in sorted(directory.iterdir()):
@@ -326,7 +306,7 @@ def _discover_modules_recursive(root: Path) -> list:
             if f.is_file()
         )
         if has_root_files:
-            modules.append(ModuleConfig(name="core", path=".", depends_on=[]))
+            modules.append(ModuleConfig(name="core", path=".", cannot_depend_on=[]))
 
     return modules
 
@@ -348,22 +328,13 @@ def run_auto_scan(source_root: str | Path) -> GovernanceReport:
         rules=RulesConfig(
             no_cycles=True,
             enforce_layers=False,
-            enforce_depends_on=False,
+            enforce_cannot_depend_on=True,
             exclude_test_files=True,
         ),
     )
 
     extractions = extract_directory(source_root, config.language, config.rules.exclude_test_files)
     graph = build_dependency_graph(extractions, config)
-
-    # Populate actual depends_on so discover report is useful
-    module_names = {mod.name for mod in config.modules}
-    for mod in config.modules:
-        deps = sorted(
-            t for t in graph.module_edges.get(mod.name, {})
-            if t in module_names and t != mod.name
-        )
-        mod.depends_on = deps
 
     violations: list[Violation] = []
     for rule_fn in ALL_RULES:
@@ -381,24 +352,3 @@ def run_auto_scan(source_root: str | Path) -> GovernanceReport:
     )
 
 
-def populate_dependencies(config_path: str | Path) -> GovernanceConfig:
-    config_path = Path(config_path)
-    config = load_config(config_path)
-    repo_root = config_path.parent
-    source_root = repo_root / config.root
-
-    if not source_root.exists():
-        raise FileNotFoundError(f"Source root not found: {source_root}")
-
-    extractions = extract_directory(source_root, config.language, config.rules.exclude_test_files)
-    graph = build_dependency_graph(extractions, config)
-
-    module_names = {mod.name for mod in config.modules}
-    for mod in config.modules:
-        deps = sorted(
-            t for t in graph.module_edges.get(mod.name, {})
-            if t in module_names and t != mod.name
-        )
-        mod.depends_on = deps
-
-    return config

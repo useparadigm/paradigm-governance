@@ -2,7 +2,7 @@ from code_governance.config import load_config
 from code_governance.dep_graph import build_dependency_graph
 from code_governance.extractor import extract_directory
 from code_governance.rules import (
-    check_enforce_depends_on,
+    check_enforce_cannot_depend_on,
     check_enforce_layers,
     check_min_cohesion,
     check_max_public_surface,
@@ -30,14 +30,14 @@ def test_no_cycles_detects_cycle(sample_config):
     assert "db" in cycle_details
 
 
-def test_enforce_depends_on_detects_undeclared(sample_config):
+def test_enforce_cannot_depend_on_detects_forbidden(sample_config):
     graph, config = _build_graph(sample_config)
-    violations = check_enforce_depends_on(graph, config)
-    # core depends_on is empty but core/service.py imports from db
+    violations = check_enforce_cannot_depend_on(graph, config)
+    # core cannot_depend_on = ["db"] but core/service.py imports from db
     assert len(violations) > 0
-    undeclared = [v for v in violations if v.module == "core"]
-    assert len(undeclared) > 0
-    assert "db" in undeclared[0].detail
+    forbidden = [v for v in violations if v.module == "core"]
+    assert len(forbidden) > 0
+    assert "db" in forbidden[0].detail
 
 
 def test_enforce_layers_detects_violation(sample_config):

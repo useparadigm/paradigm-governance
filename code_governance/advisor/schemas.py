@@ -11,14 +11,14 @@ class ViolationAdvice(BaseModel):
     risk_assessment: str
     recommended_action: Literal["accept", "restructure", "extract_shared_module"]
     action_detail: str
-    suggested_depends_on: Optional[list[str]] = None
+    suggested_cannot_depend_on: Optional[list[str]] = None
     effort_estimate: Literal["trivial", "small", "medium", "large"]
 
 
 class ModulePlacementAdvice(BaseModel):
     module_name: str
     recommended_layer: Optional[str] = None
-    recommended_depends_on: list[str] = []
+    recommended_cannot_depend_on: list[str] = []
     architectural_rationale: str
 
 
@@ -40,13 +40,13 @@ class AdviceReport(BaseModel):
             e = effort_icon.get(va.effort_estimate, "⚪")
             a = action_icon.get(va.recommended_action, "💡")
             deps = ""
-            if va.suggested_depends_on is not None:
-                deps = f" → `depends_on: {va.suggested_depends_on}`"
+            if va.suggested_cannot_depend_on is not None:
+                deps = f" → `cannot_depend_on: {va.suggested_cannot_depend_on}`"
             lines.append(f"{a} **#{va.violation_id + 1}** {va.action_detail}{deps} {e}")
 
         for ma in self.module_advice:
-            deps = ", ".join(f"`{d}`" for d in ma.recommended_depends_on) if ma.recommended_depends_on else "none"
+            deps = ", ".join(f"`{d}`" for d in ma.recommended_cannot_depend_on) if ma.recommended_cannot_depend_on else "none"
             layer = f"layer=`{ma.recommended_layer}` " if ma.recommended_layer else ""
-            lines.append(f"📦 **`{ma.module_name}`**: {layer}depends_on=[{deps}]. {ma.architectural_rationale}")
+            lines.append(f"📦 **`{ma.module_name}`**: {layer}cannot_depend_on=[{deps}]. {ma.architectural_rationale}")
 
         return "\n".join(lines)

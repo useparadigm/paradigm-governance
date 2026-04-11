@@ -20,7 +20,7 @@ class Severity(str, Enum):
 class RuleKind(str, Enum):
     NO_CYCLES = "no_cycles"
     ENFORCE_LAYERS = "enforce_layers"
-    ENFORCE_DEPENDS_ON = "enforce_depends_on"
+    ENFORCE_CANNOT_DEPEND_ON = "enforce_cannot_depend_on"
     MAX_PUBLIC_SURFACE = "max_public_surface"
     MIN_COHESION = "min_cohesion"
 
@@ -28,7 +28,7 @@ class RuleKind(str, Enum):
 class ModuleConfig(BaseModel):
     name: str
     path: str
-    depends_on: list[str] = []
+    cannot_depend_on: list[str] = []
     layer: Optional[str] = None
 
 
@@ -39,7 +39,7 @@ class LayersConfig(BaseModel):
 class RulesConfig(BaseModel):
     no_cycles: bool = True
     enforce_layers: bool = False
-    enforce_depends_on: bool = True
+    enforce_cannot_depend_on: bool = True
     max_public_surface: Optional[float] = None
     min_cohesion: Optional[float] = None
     exclude_from_cycles: list[str] = []

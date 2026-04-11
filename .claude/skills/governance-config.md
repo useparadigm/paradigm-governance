@@ -12,8 +12,8 @@ governance-ast --generate --source-root <path-to-source> --config governance.tom
 
 This creates a `governance.toml` with:
 - All top-level directories as modules
-- Real `depends_on` populated from actual imports
-- No enforcement rules (ground truth only)
+- Empty `cannot_depend_on` (no restrictions by default)
+- Default enforcement rules
 
 ## Step 2: Read and analyze the generated config
 
@@ -45,16 +45,16 @@ Categorize each module into an architectural layer. Common patterns:
 
 Set `layers.order` from highest to lowest. Higher layers may import from lower layers, not vice versa.
 
-### Prune depends_on
-The auto-generated `depends_on` reflects reality. Now decide what SHOULD be allowed:
-- Remove dependencies that represent architecture violations
-- Keep dependencies that are intentional
+### Add forbidden dependencies
+By default, all imports are allowed. Add modules to `cannot_depend_on` to block unwanted dependencies:
+- Identify cross-module imports that violate your architecture
+- Add forbidden targets to `cannot_depend_on`
 
 ### Enable rules
 ```toml
 [rules]
 no_cycles = true              # Almost always enable
-enforce_depends_on = true      # Enable once depends_on is curated
+enforce_cannot_depend_on = true # Enable to enforce forbidden imports
 enforce_layers = true          # Enable once layers are assigned
 exclude_test_files = true      # Usually true
 # max_public_surface = 0.5     # Optional: warn on leaky modules
@@ -85,7 +85,7 @@ governance-ast --save-baseline .governance-baseline.json
 
 The config is a living document. As the codebase evolves:
 - Add new modules when new directories appear
-- Update `depends_on` when architecture changes
+- Update `cannot_depend_on` when architecture changes
 - Tighten rules gradually (enable layers, lower thresholds)
 
 ## Example enriched config
@@ -98,31 +98,31 @@ language = "python"
 [[modules]]
 name = "api"
 path = "api/"
-depends_on = ["services", "models"]
+cannot_depend_on = ["repositories"]
 layer = "presentation"
 
 [[modules]]
 name = "services"
 path = "services/"
-depends_on = ["models", "repositories"]
+cannot_depend_on = []
 layer = "application"
 
 [[modules]]
 name = "models"
 path = "models/"
-depends_on = []
+cannot_depend_on = ["api", "services", "repositories"]
 layer = "domain"
 
 [[modules]]
 name = "repositories"
 path = "repositories/"
-depends_on = ["models"]
+cannot_depend_on = ["api", "services"]
 layer = "infrastructure"
 
 [[modules]]
 name = "utils"
 path = "utils/"
-depends_on = []
+cannot_depend_on = ["api", "services", "repositories"]
 layer = "shared"
 
 [layers]
@@ -131,7 +131,7 @@ order = ["presentation", "application", "domain", "infrastructure", "shared"]
 [rules]
 no_cycles = true
 enforce_layers = true
-enforce_depends_on = true
+enforce_cannot_depend_on = true
 exclude_test_files = true
 exclude_from_cycles = ["utils"]
 ```

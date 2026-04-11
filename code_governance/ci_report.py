@@ -15,7 +15,7 @@ from code_governance.schemas import GovernanceConfig, RuleKind, Violation
 
 
 RULE_ICON = {
-    RuleKind.ENFORCE_DEPENDS_ON: "🔗",
+    RuleKind.ENFORCE_CANNOT_DEPEND_ON: "🔗",
     RuleKind.NO_CYCLES: "🔄",
     RuleKind.ENFORCE_LAYERS: "📐",
     RuleKind.MAX_PUBLIC_SURFACE: "📡",
@@ -67,7 +67,7 @@ def _suggest_config_update(
         updated.modules.append(ModuleConfig(
             name=mod["name"],
             path=mod["path"],
-            depends_on=[],
+            cannot_depend_on=[],
         ))
     return config_to_toml(updated)
 
@@ -122,9 +122,9 @@ def generate_ci_report(
             lines.append(f'[[modules]]')
             lines.append(f'name = "{mod["name"]}"')
             lines.append(f'path = "{mod["path"]}"')
-            lines.append(f'depends_on = []')
+            lines.append(f'cannot_depend_on = []')
         lines.append("```")
-        lines.append("`depends_on` will be auto-populated from actual imports.")
+        lines.append("Add forbidden dependencies to `cannot_depend_on` as needed.")
         lines.append("</details>")
         lines.append("")
 

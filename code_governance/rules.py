@@ -107,25 +107,25 @@ def check_enforce_layers(graph: DependencyGraph, config: GovernanceConfig) -> li
     return violations
 
 
-def check_enforce_depends_on(graph: DependencyGraph, config: GovernanceConfig) -> list[Violation]:
-    if not config.rules.enforce_depends_on:
+def check_enforce_cannot_depend_on(graph: DependencyGraph, config: GovernanceConfig) -> list[Violation]:
+    if not config.rules.enforce_cannot_depend_on:
         return []
 
-    allowed: dict[str, set[str]] = {}
+    forbidden: dict[str, set[str]] = {}
     for mod in config.modules:
-        allowed[mod.name] = set(mod.depends_on)
+        forbidden[mod.name] = set(mod.cannot_depend_on)
 
     violations: list[Violation] = []
     for src_mod, deps in graph.module_edges.items():
-        if src_mod not in allowed:
+        if src_mod not in forbidden:
             continue
         for dep_mod in deps:
-            if dep_mod not in allowed.get(src_mod, set()):
+            if dep_mod in forbidden.get(src_mod, set()):
                 evidence = _evidence_for_edge(graph.edge_details, src_mod, dep_mod)
                 violations.append(Violation(
-                    rule=RuleKind.ENFORCE_DEPENDS_ON,
+                    rule=RuleKind.ENFORCE_CANNOT_DEPEND_ON,
                     module=src_mod,
-                    detail=f"Undeclared dependency: '{src_mod}' imports '{dep_mod}' (allowed: {sorted(allowed.get(src_mod, set()))})",
+                    detail=f"Forbidden dependency: '{src_mod}' imports '{dep_mod}' (cannot_depend_on: {sorted(forbidden.get(src_mod, set()))})",
                     evidence=evidence,
                 ))
 
@@ -203,7 +203,7 @@ def compute_module_metrics(graph: DependencyGraph, config: GovernanceConfig) -> 
 ALL_RULES = [
     check_no_cycles,
     check_enforce_layers,
-    check_enforce_depends_on,
+    check_enforce_cannot_depend_on,
     check_max_public_surface,
     check_min_cohesion,
 ]

@@ -5,7 +5,7 @@ import json
 import sys
 from pathlib import Path
 
-from code_governance.engine import config_to_toml, discover_dependencies, generate_config, generate_full_config, populate_dependencies, run_auto_scan, run_governance, run_governance_diff
+from code_governance.engine import config_to_toml, discover_dependencies, generate_config, generate_full_config, run_auto_scan, run_governance, run_governance_diff
 
 
 def main():
@@ -33,11 +33,6 @@ def main():
         "--discover",
         action="store_true",
         help="Discover actual dependencies between modules (instead of checking rules)",
-    )
-    parser.add_argument(
-        "--fix-deps",
-        action="store_true",
-        help="Auto-populate depends_on from actual imports (rewrites config in place)",
     )
     parser.add_argument(
         "--save-baseline",
@@ -101,10 +96,6 @@ def main():
 
     if args.generate:
         _handle_generate(args)
-        return
-
-    if args.fix_deps:
-        _handle_fix_deps(args)
         return
 
     if args.discover:
@@ -171,22 +162,7 @@ def _handle_generate(args):
     toml_str = config_to_toml(config)
     out_path.write_text(toml_str)
 
-    total_deps = sum(len(m.depends_on) for m in config.modules)
-    print(f"Generated {out_path} with {len(config.modules)} modules, {total_deps} dependencies")
-
-
-def _handle_fix_deps(args):
-    config_path = Path(args.config)
-    if not config_path.exists():
-        print(f"Config not found: {config_path}", file=sys.stderr)
-        sys.exit(1)
-
-    config = populate_dependencies(config_path)
-    toml_str = config_to_toml(config)
-    config_path.write_text(toml_str)
-
-    total_deps = sum(len(m.depends_on) for m in config.modules)
-    print(f"Updated {config_path} — {len(config.modules)} modules, {total_deps} dependencies populated")
+    print(f"Generated {out_path} with {len(config.modules)} modules")
 
 
 def _handle_discover(args):

@@ -42,6 +42,7 @@ class RulesConfig(BaseModel):
     enforce_cannot_depend_on: bool = True
     max_public_surface: Optional[float] = None
     min_cohesion: Optional[float] = None
+    transitive: bool = False
     exclude_from_cycles: list[str] = []
     exclude_test_files: bool = True
 

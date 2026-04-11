@@ -5,6 +5,7 @@ import json
 import sys
 from pathlib import Path
 
+from code_governance.config import load_config
 from code_governance.engine import config_to_toml, discover_dependencies, generate_config, generate_full_config, run_auto_scan, run_governance, run_governance_diff
 
 
@@ -78,6 +79,11 @@ def main():
         nargs="?",
         const=".",
         help="Zero-config scan: discover modules from source and check for cycles. No governance.toml needed.",
+    )
+    parser.add_argument(
+        "--transitive",
+        action="store_true",
+        help="Check transitive dependencies (detects indirect violations through dependency chains)",
     )
 
     args = parser.parse_args()
@@ -198,10 +204,14 @@ def _handle_check(args):
         print("Run with --fix-config to generate one", file=sys.stderr)
         sys.exit(1)
 
+    config = load_config(config_path)
+    if args.transitive:
+        config.rules.transitive = True
+
     if args.diff:
-        report = run_governance_diff(config_path, args.diff)
+        report = run_governance_diff(config_path, args.diff, config=config)
     else:
-        report = run_governance(config_path)
+        report = run_governance(config_path, config=config)
 
     baseline_keys: set[tuple[str, str, str]] | None = None
     baseline_path = args.baseline

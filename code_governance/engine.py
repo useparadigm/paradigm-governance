@@ -15,9 +15,10 @@ from code_governance.schemas import (
 )
 
 
-def run_governance(config_path: str | Path) -> GovernanceReport:
+def run_governance(config_path: str | Path, *, config: GovernanceConfig | None = None) -> GovernanceReport:
     config_path = Path(config_path)
-    config = load_config(config_path)
+    if config is None:
+        config = load_config(config_path)
     repo_root = config_path.parent
     source_root = repo_root / config.root
 
@@ -44,11 +45,12 @@ def run_governance(config_path: str | Path) -> GovernanceReport:
     )
 
 
-def run_governance_diff(config_path: str | Path, git_ref: str = "HEAD") -> GovernanceReport:
+def run_governance_diff(config_path: str | Path, git_ref: str = "HEAD", *, config: GovernanceConfig | None = None) -> GovernanceReport:
     import subprocess
 
     config_path = Path(config_path)
-    config = load_config(config_path)
+    if config is None:
+        config = load_config(config_path)
     repo_root = config_path.parent
     source_root = repo_root / config.root
 
@@ -188,6 +190,7 @@ def config_to_toml(config: GovernanceConfig) -> str:
     lines.append(f"no_cycles = {'true' if config.rules.no_cycles else 'false'}")
     lines.append(f"enforce_layers = {'true' if config.rules.enforce_layers else 'false'}")
     lines.append(f"enforce_cannot_depend_on = {'true' if config.rules.enforce_cannot_depend_on else 'false'}")
+    lines.append(f"transitive = {'true' if config.rules.transitive else 'false'}")
     lines.append(f"exclude_test_files = {'true' if config.rules.exclude_test_files else 'false'}")
     if config.rules.exclude_from_cycles:
         excluded = ", ".join(f'"{e}"' for e in config.rules.exclude_from_cycles)

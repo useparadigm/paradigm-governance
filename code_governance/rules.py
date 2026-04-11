@@ -13,6 +13,14 @@ from code_governance.schemas import (
 )
 
 
+def _transitive_evidence(edge_details: list[EdgeDetail], path: list[str]) -> list[dict]:
+    """Collect evidence for each hop in a transitive path."""
+    evidence: list[dict] = []
+    for i in range(len(path) - 1):
+        evidence.extend(_evidence_for_edge(edge_details, path[i], path[i + 1]))
+    return evidence
+
+
 def _evidence_for_edge(edge_details: list[EdgeDetail], src: str, tgt: str) -> list[dict]:
     seen: set[tuple[str, int]] = set()
     results: list[dict] = []
@@ -83,6 +91,8 @@ def check_enforce_layers(graph: DependencyGraph, config: GovernanceConfig) -> li
     module_layer = {m.name: m.layer for m in config.modules if m.layer}
 
     violations: list[Violation] = []
+    direct_layer_violations: set[tuple[str, str]] = set()
+
     for src_mod, deps in graph.module_edges.items():
         src_layer = module_layer.get(src_mod)
         if not src_layer or src_layer not in layer_rank:
@@ -96,6 +106,7 @@ def check_enforce_layers(graph: DependencyGraph, config: GovernanceConfig) -> li
             dep_rank = layer_rank[dep_layer]
 
             if dep_rank > src_rank:
+                direct_layer_violations.add((src_mod, dep_mod))
                 evidence = _evidence_for_edge(graph.edge_details, src_mod, dep_mod)
                 violations.append(Violation(
                     rule=RuleKind.ENFORCE_LAYERS,
@@ -103,6 +114,33 @@ def check_enforce_layers(graph: DependencyGraph, config: GovernanceConfig) -> li
                     detail=f"Layer violation: '{src_mod}' ({src_layer}) imports '{dep_mod}' ({dep_layer})",
                     evidence=evidence,
                 ))
+
+    if config.rules.transitive:
+        module_names = {m.name for m in config.modules}
+        for src_mod in module_names:
+            src_layer = module_layer.get(src_mod)
+            if not src_layer or src_layer not in layer_rank:
+                continue
+            src_rank = layer_rank[src_layer]
+
+            transitive = graph.get_transitive_dependencies(src_mod)
+            for dep_mod, path in transitive.items():
+                if (src_mod, dep_mod) in direct_layer_violations:
+                    continue
+                dep_layer = module_layer.get(dep_mod)
+                if not dep_layer or dep_layer not in layer_rank:
+                    continue
+                dep_rank = layer_rank[dep_layer]
+
+                if dep_rank > src_rank:
+                    evidence = _transitive_evidence(graph.edge_details, path)
+                    chain = " → ".join(path)
+                    violations.append(Violation(
+                        rule=RuleKind.ENFORCE_LAYERS,
+                        module=src_mod,
+                        detail=f"Transitive layer violation: '{src_mod}' ({src_layer}) transitively imports '{dep_mod}' ({dep_layer}) via {chain}",
+                        evidence=evidence,
+                    ))
 
     return violations
 
@@ -116,11 +154,14 @@ def check_enforce_cannot_depend_on(graph: DependencyGraph, config: GovernanceCon
         forbidden[mod.name] = set(mod.cannot_depend_on)
 
     violations: list[Violation] = []
+    direct_forbidden: set[tuple[str, str]] = set()
+
     for src_mod, deps in graph.module_edges.items():
         if src_mod not in forbidden:
             continue
         for dep_mod in deps:
             if dep_mod in forbidden.get(src_mod, set()):
+                direct_forbidden.add((src_mod, dep_mod))
                 evidence = _evidence_for_edge(graph.edge_details, src_mod, dep_mod)
                 violations.append(Violation(
                     rule=RuleKind.ENFORCE_CANNOT_DEPEND_ON,
@@ -128,6 +169,22 @@ def check_enforce_cannot_depend_on(graph: DependencyGraph, config: GovernanceCon
                     detail=f"Forbidden dependency: '{src_mod}' imports '{dep_mod}' (cannot_depend_on: {sorted(forbidden.get(src_mod, set()))})",
                     evidence=evidence,
                 ))
+
+    if config.rules.transitive:
+        for src_mod in forbidden:
+            if not forbidden[src_mod]:
+                continue
+            transitive = graph.get_transitive_dependencies(src_mod)
+            for dep_mod, path in transitive.items():
+                if dep_mod in forbidden[src_mod] and (src_mod, dep_mod) not in direct_forbidden:
+                    evidence = _transitive_evidence(graph.edge_details, path)
+                    chain = " → ".join(path)
+                    violations.append(Violation(
+                        rule=RuleKind.ENFORCE_CANNOT_DEPEND_ON,
+                        module=src_mod,
+                        detail=f"Forbidden transitive dependency: '{src_mod}' transitively imports '{dep_mod}' via {chain}",
+                        evidence=evidence,
+                    ))
 
     return violations
 

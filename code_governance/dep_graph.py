@@ -32,6 +32,37 @@ class DependencyGraph:
     def get_module_dependencies(self, module_name: str) -> set[str]:
         return set(self.module_edges.get(module_name, {}).keys())
 
+    def get_transitive_dependencies(self, module_name: str) -> dict[str, list[str]]:
+        """Return all transitively reachable modules with shortest path from source.
+
+        Returns {reachable_module: [module_name, ..., reachable_module]}.
+        Handles cycles via visited set. Excludes self-loops.
+        """
+        from collections import deque
+
+        result: dict[str, list[str]] = {}
+        queue: deque[tuple[str, list[str]]] = deque()
+        visited: set[str] = {module_name}
+
+        for neighbor in self.module_edges.get(module_name, {}):
+            if neighbor != module_name:
+                path = [module_name, neighbor]
+                queue.append((neighbor, path))
+                visited.add(neighbor)
+                result[neighbor] = path
+
+        while queue:
+            current, path = queue.popleft()
+            for neighbor in self.module_edges.get(current, {}):
+                if neighbor in visited:
+                    continue
+                visited.add(neighbor)
+                new_path = path + [neighbor]
+                result[neighbor] = new_path
+                queue.append((neighbor, new_path))
+
+        return result
+
 
 def build_dependency_graph(
     extractions: list[FileExtractionResult],

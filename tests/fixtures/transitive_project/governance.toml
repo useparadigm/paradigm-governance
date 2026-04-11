@@ -1,0 +1,37 @@
+[governance]
+root = "."
+language = "python"
+
+[[modules]]
+name = "api"
+path = "api/"
+cannot_depend_on = ["db"]
+layer = "api"
+
+[[modules]]
+name = "service"
+path = "service/"
+cannot_depend_on = []
+layer = "service"
+
+[[modules]]
+name = "db"
+path = "db/"
+cannot_depend_on = []
+layer = "db"
+
+[[modules]]
+name = "utils"
+path = "utils/"
+cannot_depend_on = []
+layer = "utils"
+
+[layers]
+order = ["api", "service", "db", "utils"]
+
+[rules]
+no_cycles = true
+enforce_layers = true
+enforce_cannot_depend_on = true
+transitive = true
+exclude_test_files = true

@@ -22,12 +22,51 @@
 | One refactor breaks 14 files across 6 modules | Boundaries are explicit, changes stay local |
 | New dev: "Can I import this here?" "Uhh... maybe?" | Config says yes or no. CI enforces it. |
 
-## Zero-config scan
+## Setup
 
-No setup needed. Point it at your code:
+### Option 1: With Claude Code (recommended)
+
+Install the plugin — Claude handles everything interactively:
+
+```
+/plugin marketplace add useparadigm/code-governance-plugin
+/plugin install code-governance
+```
+
+Then run:
+
+```
+/governance-init
+```
+
+**What happens:**
+
+1. Claude installs `code-governance` in your project
+2. Scans your codebase — discovers modules, maps every import
+3. Shows you the dependency map: *"I found 8 modules. `api` imports from `db` directly — should it?"*
+4. You discuss architecture: which dependencies are intentional, which are spaghetti
+5. Claude creates `governance.toml` based on your answers
+6. Enables rules: `no_cycles`, `enforce_depends_on`, optionally `enforce_layers`
+7. If existing violations: *"Want a baseline? I'll accept these and only fail on new ones."*
+8. Sets up GitHub Actions — CI check on every PR + `/governance fix` command
+9. Done. Every PR is now gated on architecture rules.
+
+**After setup, two more commands available:**
+
+| Command | What it does |
+|---------|-------------|
+| `/governance-check` | Run checks, explain violations, fix them interactively |
+| `/governance-audit` | Architecture health review — metrics, hotspots, suggestions |
+
+### Option 2: Manual
 
 ```bash
-$ pip install code-governance
+pip install code-governance
+```
+
+**Quick scan** — no config needed, instant results:
+
+```bash
 $ governance-ast --auto src/
 
 Governance Report (python)
@@ -39,34 +78,32 @@ Violations (1):
 FAILED
 ```
 
-Found a cycle in 1.2 seconds. No config file. No contract definitions.
-
-## Quick start with Claude Code
-
-The fastest path — the plugin handles everything interactively:
-
-```
-/plugin marketplace add useparadigm/code-governance-plugin
-/plugin install code-governance
-/governance-init
-```
-
-Claude scans your codebase, asks about your architecture, creates config, and sets up CI.
-
-## Manual setup
+**Full setup** — generate config, review, enforce:
 
 ```bash
-pip install code-governance
-
-# Generate config from your project — detects modules, maps real imports
+# Generate config from source — detects modules, maps real imports
 governance-ast --generate --source-root src/
 
 # See the dependency map
 governance-ast --discover
 
-# Enforce it
+# Edit governance.toml — remove dependencies you don't want, add layers
+# Then enforce:
 governance-ast
 ```
+
+**Set up CI** — add to `.github/workflows/governance.yml`:
+
+```yaml
+- uses: actions/checkout@v4
+- name: Governance
+  uses: useparadigm/code-governance@main
+  with:
+    config: governance.toml
+    diff: origin/main
+```
+
+See [governance-fix workflow](#governance-fix-workflow) to enable the `/governance fix` PR command.
 
 ## What it catches
 
@@ -78,23 +115,9 @@ governance-ast
 | `max_public_surface` | 80% of `core`'s symbols used externally — too exposed |
 | `min_cohesion` | `utils` imports 90% from other modules — grab-bag module |
 
-## CI
+## What happens in CI
 
-### GitHub Action
-
-```yaml
-- uses: actions/checkout@v4
-- name: Governance
-  uses: useparadigm/code-governance@main
-  with:
-    config: governance.toml
-    diff: origin/main
-    advise: true
-  env:
-    OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-```
-
-PR comment:
+Every PR gets a governance comment:
 
 ```
 ❌ Governance — 1 violation, 1 new module
@@ -110,9 +133,9 @@ Reply /governance fix to apply.
 types into a common module, or add "db" to core's depends_on.
 ```
 
-### `/governance fix`
+**New module detected?** Reply `/governance fix` — bot adds it to config with `depends_on` populated from actual imports, commits to your branch.
 
-Reply `/governance fix` on a PR → bot adds new modules to config, populates `depends_on` from actual imports, commits to your branch. [Setup](#governance-fix-workflow)
+**Violation?** Fix the import or update `governance.toml`. Use `/governance-check` in Claude Code for interactive help.
 
 ### Pre-commit
 

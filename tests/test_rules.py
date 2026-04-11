@@ -22,9 +22,6 @@ def _build_graph(sample_config):
 
 def test_no_cycles_detects_cycle(sample_config):
     graph, config = _build_graph(sample_config)
-    # With enforce_depends_on=True, cycles involving undeclared deps are skipped
-    # (they're already caught by enforce_depends_on). Disable it to test pure cycle detection.
-    config.rules.enforce_depends_on = False
     violations = check_no_cycles(graph, config)
     assert len(violations) > 0
     assert all(v.rule == RuleKind.NO_CYCLES for v in violations)

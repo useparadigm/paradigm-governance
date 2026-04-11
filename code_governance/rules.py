@@ -39,11 +39,6 @@ def check_no_cycles(graph: DependencyGraph, config: GovernanceConfig) -> list[Vi
 
     cycles = _find_cycles(adjacency)
 
-    allowed: dict[str, set[str]] = {}
-    if config.rules.enforce_depends_on:
-        for mod in config.modules:
-            allowed[mod.name] = set(mod.depends_on)
-
     unique_cycles: list[list[str]] = []
     seen_cycles: set[frozenset[str]] = set()
     for cycle in cycles:
@@ -62,14 +57,6 @@ def check_no_cycles(graph: DependencyGraph, config: GovernanceConfig) -> list[Vi
         if len(cycle) > 2:
             is_superset = any(s.issubset(frozenset(cycle)) for s in simple_node_sets)
             if is_superset:
-                continue
-
-        if config.rules.enforce_depends_on and allowed:
-            edges = [(cycle[i], cycle[(i + 1) % len(cycle)]) for i in range(len(cycle))]
-            has_disallowed = any(
-                tgt not in allowed.get(src, set()) for src, tgt in edges
-            )
-            if has_disallowed:
                 continue
 
         cycle_str = " -> ".join(cycle + [cycle[0]])

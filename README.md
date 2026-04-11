@@ -24,7 +24,19 @@ Codebases rot from the inside. One "quick" import across a module boundary becom
 
 `code-governance` makes module boundaries explicit and enforced. Like a linter for your architecture.
 
-## Install
+## Quick start with Claude Code
+
+The fastest way to get started — the plugin handles everything interactively:
+
+```
+/plugin marketplace add useparadigm/code-governance-plugin
+/plugin install code-governance
+/governance-init
+```
+
+Claude scans your codebase, asks about your architecture, creates `governance.toml`, and sets up CI. See the [plugin repo](https://github.com/useparadigm/code-governance-plugin) for details.
+
+## Install (manual)
 
 ```bash
 pip install code-governance

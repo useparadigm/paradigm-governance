@@ -1,32 +1,49 @@
-# code-governance
+<p align="center">
+  <img src="code-governance.jpg" alt="code-governance" width="200">
+</p>
 
-**Enforce module boundaries in Python. Catch architectural violations in CI.**
+<h1 align="center">code-governance</h1>
 
-```
-$ governance-ast
+<p align="center"><b>Stop spaghetti imports. Enforce module boundaries in Python.</b></p>
+
+<p align="center">
+  <a href="https://pypi.org/project/code-governance/"><img src="https://img.shields.io/pypi/v/code-governance?style=flat&color=orange" alt="PyPI"></a>
+  <a href="https://github.com/useparadigm/code-governance/actions"><img src="https://img.shields.io/github/actions/workflow/status/useparadigm/code-governance/tests.yml?style=flat&label=tests" alt="Tests"></a>
+  <a href="https://github.com/useparadigm/code-governance/blob/main/LICENSE"><img src="https://img.shields.io/github/license/useparadigm/code-governance?style=flat" alt="License"></a>
+</p>
+
+---
+
+## Before / After
+
+| Without governance | With governance |
+|---|---|
+| `api/` imports from `billing/`, `db/`, `auth/`, `utils/`, `migrations/`... | `api/` imports from `core/`, `auth/` — nothing else allowed |
+| One refactor breaks 14 files across 6 modules | Boundaries are explicit, changes stay local |
+| New dev: "Can I import this here?" "Uhh... maybe?" | Config says yes or no. CI enforces it. |
+
+## Zero-config scan
+
+No setup needed. Point it at your code:
+
+```bash
+$ pip install code-governance
+$ governance-ast --auto src/
+
 Governance Report (python)
-Modules: 5 | Files scanned: 47
+Modules: 8 | Files scanned: 47
 
-Violations (2):
-  [E] [enforce_depends_on] Undeclared dependency: 'api' imports 'billing' (allowed: ['core', 'auth'])
-      api/checkout.py:3    from billing.stripe import charge_customer
+Violations (1):
   [E] [no_cycles] Circular dependency: payments -> notifications -> payments
-      payments/process.py:1    from notifications.email import send_receipt
 
 FAILED
 ```
 
-Define allowed dependencies between modules in a `governance.toml`. Run it locally, in CI, or let an LLM tell you what to fix.
-
-## Why
-
-Codebases rot from the inside. One "quick" import across a module boundary becomes ten, and suddenly everything depends on everything. Tests break for no reason, refactors are impossible, and new developers can't tell where one module ends and another begins.
-
-`code-governance` makes module boundaries explicit and enforced. Like a linter for your architecture.
+Found a cycle in 1.2 seconds. No config file. No contract definitions.
 
 ## Quick start with Claude Code
 
-The fastest way to get started — the plugin handles everything interactively:
+The fastest path — the plugin handles everything interactively:
 
 ```
 /plugin marketplace add useparadigm/code-governance-plugin
@@ -34,71 +51,32 @@ The fastest way to get started — the plugin handles everything interactively:
 /governance-init
 ```
 
-Claude scans your codebase, asks about your architecture, creates `governance.toml`, and sets up CI. See the [plugin repo](https://github.com/useparadigm/code-governance-plugin) for details.
+Claude scans your codebase, asks about your architecture, creates config, and sets up CI.
 
-## Install (manual)
+## Manual setup
 
 ```bash
 pip install code-governance
-```
 
-## 30-second setup
-
-```bash
 # Generate config from your project — detects modules, maps real imports
 governance-ast --generate --source-root src/
 
-# See what you've got
+# See the dependency map
 governance-ast --discover
 
 # Enforce it
 governance-ast
 ```
 
-This creates a `governance.toml`:
-
-```toml
-[governance]
-root = "src"
-language = "python"
-
-[[modules]]
-name = "api"
-path = "api/"
-depends_on = ["core", "auth"]
-layer = "presentation"
-
-[[modules]]
-name = "core"
-path = "core/"
-depends_on = []
-layer = "domain"
-
-[[modules]]
-name = "auth"
-path = "auth/"
-depends_on = ["core"]
-layer = "infrastructure"
-
-[layers]
-order = ["presentation", "infrastructure", "domain"]
-
-[rules]
-no_cycles = true
-enforce_layers = true
-enforce_depends_on = true
-exclude_test_files = true
-```
-
 ## What it catches
 
-| Rule | What it does |
-|------|-------------|
-| `enforce_depends_on` | Module imports something not in its `depends_on` list |
-| `no_cycles` | A imports B imports A |
-| `enforce_layers` | Lower layer imports from a higher one |
-| `max_public_surface` | Too many symbols exposed to other modules (float threshold) |
-| `min_cohesion` | Module imports more externally than internally (float threshold) |
+| Rule | Example |
+|------|---------|
+| `enforce_depends_on` | `api` imports `billing` but only `core`, `auth` are allowed |
+| `no_cycles` | `payments` -> `notifications` -> `payments` |
+| `enforce_layers` | `db` (infrastructure) imports from `api` (presentation) |
+| `max_public_surface` | 80% of `core`'s symbols used externally — too exposed |
+| `min_cohesion` | `utils` imports 90% from other modules — grab-bag module |
 
 ## CI
 
@@ -116,7 +94,7 @@ exclude_test_files = true
     OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 ```
 
-Posts a comment on your PR:
+PR comment:
 
 ```
 ❌ Governance — 1 violation, 1 new module
@@ -132,19 +110,9 @@ Reply /governance fix to apply.
 types into a common module, or add "db" to core's depends_on.
 ```
 
-| Input | Description | Default |
-|-------|-------------|---------|
-| `config` | Path to `governance.toml` | `governance.toml` |
-| `diff` | Only check files changed since this ref | — |
-| `baseline` | Path to baseline JSON | — |
-| `advise` | LLM architectural advice (needs API key) | `false` |
-| `comment` | Post PR comment | `true` |
-
 ### `/governance fix`
 
-When new modules are detected, reply `/governance fix` on the PR. The bot adds them to `governance.toml` with `depends_on` auto-populated from actual imports, and commits to your branch.
-
-To enable, add [`.github/workflows/governance-fix.yml`](#governance-fix-workflow) to your repo.
+Reply `/governance fix` on a PR → bot adds new modules to config, populates `depends_on` from actual imports, commits to your branch. [Setup](#governance-fix-workflow)
 
 ### Pre-commit
 
@@ -154,25 +122,17 @@ repos:
     rev: main
     hooks:
       - id: governance-check
-      - id: governance-diff   # only changed files
+      - id: governance-diff
 ```
 
-### Baseline workflow
-
-Adopting on an existing codebase? Accept current violations, only fail on new ones:
+### Adopting on legacy codebases
 
 ```bash
 governance-ast --save-baseline .governance-baseline.json
 governance-ast --baseline .governance-baseline.json
 ```
 
-## HTML report
-
-```bash
-governance-ast --format html > report.html
-```
-
-Self-contained file with a dependency matrix (modules x modules heatmap, cycles highlighted) and module detail view. Also works as a standalone viewer — drop any governance JSON into it.
+Accept existing violations. Only fail on new ones.
 
 ## LLM advice
 
@@ -181,53 +141,44 @@ export OPENAI_API_KEY=sk-...   # or ANTHROPIC_API_KEY
 governance-ast --advise
 ```
 
-Analyzes your violations with an LLM and suggests whether to accept the dependency, restructure the code, or extract a shared module. Works with OpenAI and Anthropic.
+Analyzes violations and suggests: accept the dependency, restructure the code, or extract a shared module. Works with OpenAI and Anthropic.
 
-| Env var | Description |
-|---------|-------------|
-| `OPENAI_API_KEY` | OpenAI (default: gpt-4o) |
-| `ANTHROPIC_API_KEY` | Anthropic (default: claude-sonnet-4-20250514) |
-| `GOVERNANCE_LLM_MODEL` | Override model |
+## HTML report
+
+```bash
+governance-ast --format html > report.html
+```
+
+Self-contained dependency matrix with module metrics. Drop any governance JSON into it.
 
 ## vs import-linter
 
-[import-linter](https://github.com/seddonym/import-linter) is the established tool for this. Here's an honest comparison:
-
 | | code-governance | import-linter |
 |---|---|---|
-| **Setup** | `--generate` creates config from source | Manual contract definition |
-| **Config format** | TOML (governance.toml) | INI or TOML |
-| **Rules** | depends_on, cycles, layers, cohesion, surface | independence, layers, forbidden, acyclic siblings |
-| **Diff mode** | `--diff HEAD` — only check changed files | No |
+| **Setup** | `--auto` or `--generate` — zero to minimal config | Manual contract definition |
+| **Zero-config scan** | `--auto src/` — instant results | No |
+| **Diff mode** | `--diff HEAD` — only changed files | No |
 | **Baseline** | Accept existing violations, fail on new | No |
-| **CI comments** | PR comments with violations + fix suggestions | No |
-| **Auto-fix** | `/governance fix` applies config updates | No |
+| **CI comments** | PR comments with fix suggestions | No |
+| **Auto-fix** | `/governance fix` | No |
 | **LLM advice** | `--advise` — architectural recommendations | No |
-| **HTML report** | Dependency matrix + module detail viewer | Browser UI (separate) |
-| **JSON output** | Yes | No |
 | **Module metrics** | Cohesion, public surface, symbol count | No |
+| **JSON / HTML output** | Both | Text only |
+| **Package install required** | No — scans source directly | Yes — must be importable |
+| **Recursive cycle detection** | All directory levels | `acyclic_siblings` contract |
 | **Indirect imports** | Direct only | Transitive chains |
-| **Parser** | ast-grep (Rust) | grimp (compiled) |
 | **Speed (Django, 902 files)** | ~1.2s | ~0.1s |
-| **Package needs installing** | No — scans source files directly | Yes — must be importable |
-| **Agent-friendly** | Claude Code skills included | No |
+| **Claude Code plugin** | Yes | No |
 
-**Choose import-linter if** you need transitive import detection or forbidden contracts. **Choose code-governance if** you want CI integration, auto-fix, LLM advice, metrics, or zero-config setup.
-
-## Agent-friendly
-
-Ships with Claude Code skills in `.claude/skills/` that teach AI coding agents how to run checks, interpret violations, and generate configs.
+**Choose import-linter** for transitive import detection or forbidden contracts.
+**Choose code-governance** for CI integration, auto-fix, LLM advice, or zero-config setup.
 
 ---
 
-## Appendix
-
-### Governance fix workflow
-
-Add this to `.github/workflows/governance-fix.yml` to enable the `/governance fix` command:
-
 <details>
-<summary>governance-fix.yml</summary>
+<summary><h3>Governance fix workflow</h3></summary>
+
+Add to `.github/workflows/governance-fix.yml`:
 
 ```yaml
 name: Governance Fix

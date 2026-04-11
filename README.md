@@ -174,27 +174,33 @@ governance-ast --format html > report.html
 
 Self-contained dependency matrix with module metrics. Drop any governance JSON into it.
 
-## vs import-linter
+## Comparison
 
-| | code-governance | import-linter |
-|---|---|---|
-| **Setup** | `--auto` or `--generate` — zero to minimal config | Manual contract definition |
-| **Zero-config scan** | `--auto src/` — instant results | No |
-| **Diff mode** | `--diff HEAD` — only changed files | No |
-| **Baseline** | Accept existing violations, fail on new | No |
-| **CI comments** | PR comments with fix suggestions | No |
-| **Auto-fix** | `/governance fix` | No |
-| **LLM advice** | `--advise` — architectural recommendations | No |
-| **Module metrics** | Cohesion, public surface, symbol count | No |
-| **JSON / HTML output** | Both | Text only |
-| **Package install required** | No — scans source directly | Yes — must be importable |
-| **Recursive cycle detection** | All directory levels | `acyclic_siblings` contract |
-| **Indirect imports** | Direct only | Transitive chains |
-| **Speed (Django, 902 files)** | ~1.2s | ~0.1s |
-| **Claude Code plugin** | Yes | No |
+| | code-governance | tach | import-linter |
+|---|---|---|---|
+| **Zero-config scan** | `--auto` — instant | No | No |
+| **Config generation** | `--generate` from source | `tach init` (interactive TUI) | Manual |
+| **LLM advice** | `--advise` — explains + suggests fix | No | No |
+| **CI comments** | PR comments with explanations | No | No |
+| **Auto-fix from PR** | `/governance fix` | No | No |
+| **AI agent plugin** | Claude Code plugin | No | No |
+| **Diff mode** | `--diff HEAD` | No | No |
+| **Baseline** | Accept existing, fail on new | No | No |
+| **Module metrics** | Cohesion, surface, symbols | No | No |
+| **HTML report** | Dependency matrix viewer | `tach show` | Browser UI |
+| **JSON output** | Yes | Yes | No |
+| **Scans source directly** | Yes | Yes | No — must be importable |
+| **Interface enforcement** | No | Yes | No |
+| **Transitive imports** | Direct only | Direct only | Full chain |
+| **Forbidden imports** | No | `cannot_depend_on` | Forbidden contract |
+| **Visibility control** | No | Yes | No |
+| **Speed (Django)** | ~1.2s | Sub-second (Rust) | ~0.1s (grimp) |
+| **Config syntax** | Simple TOML lists | TOML with regex | INI or TOML |
+| **Maintenance** | Active | Abandoned by original team | Active, slow |
 
-**Choose import-linter** for transitive import detection or forbidden contracts.
-**Choose code-governance** for CI integration, auto-fix, LLM advice, or zero-config setup.
+**Choose tach** if you need interface enforcement or visibility control.
+**Choose import-linter** if you need transitive import detection.
+**Choose code-governance** if you want AI-guided setup, CI integration, or zero-config scanning.
 
 ---
 

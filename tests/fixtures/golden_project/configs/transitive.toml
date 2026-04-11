@@ -1,0 +1,43 @@
+[governance]
+root = ".."
+language = "python"
+
+[[modules]]
+name = "api"
+path = "api/"
+cannot_depend_on = ["infra"]
+
+[[modules]]
+name = "service"
+path = "service/"
+cannot_depend_on = []
+
+[[modules]]
+name = "domain"
+path = "domain/"
+cannot_depend_on = []
+
+[[modules]]
+name = "infra"
+path = "infra/"
+cannot_depend_on = []
+
+[[modules]]
+name = "utils"
+path = "utils/"
+cannot_depend_on = []
+
+[[modules]]
+name = "legacy"
+path = "legacy/"
+cannot_depend_on = []
+
+[layers]
+order = []
+
+[rules]
+no_cycles = false
+enforce_layers = false
+enforce_cannot_depend_on = true
+transitive = true
+exclude_test_files = true

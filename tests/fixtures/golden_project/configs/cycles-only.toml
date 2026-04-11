@@ -1,0 +1,36 @@
+[governance]
+root = ".."
+language = "python"
+
+[[modules]]
+name = "api"
+path = "api/"
+
+[[modules]]
+name = "service"
+path = "service/"
+
+[[modules]]
+name = "domain"
+path = "domain/"
+
+[[modules]]
+name = "infra"
+path = "infra/"
+
+[[modules]]
+name = "utils"
+path = "utils/"
+
+[[modules]]
+name = "legacy"
+path = "legacy/"
+
+[layers]
+order = []
+
+[rules]
+no_cycles = true
+enforce_layers = false
+enforce_cannot_depend_on = false
+exclude_test_files = true

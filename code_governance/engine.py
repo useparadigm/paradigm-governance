@@ -288,21 +288,69 @@ def generate_full_config(
     return config
 
 
+def _discover_modules_recursive(root: Path) -> list:
+    """Recursively discover all directories containing .py files."""
+    from code_governance.schemas import ModuleConfig
+
+    modules = []
+
+    def _walk(directory: Path, prefix: str):
+        has_py = any(
+            f.suffix == ".py" and not f.name.startswith("_")
+            for f in directory.iterdir()
+            if f.is_file()
+        )
+        if has_py and prefix:
+            modules.append(ModuleConfig(
+                name=prefix.replace("/", ".").rstrip("."),
+                path=prefix,
+                depends_on=[],
+            ))
+
+        for child in sorted(directory.iterdir()):
+            if not child.is_dir():
+                continue
+            if child.name.startswith(".") or child.name.startswith("_"):
+                continue
+            if child.name in _SKIP_DIRS:
+                continue
+            _walk(child, f"{prefix}{child.name}/")
+
+    _walk(root, "")
+
+    # If only root-level .py files exist (no subdirs with code), add a "core" module
+    if not modules:
+        has_root_files = any(
+            f.suffix == ".py" and not f.name.startswith("_")
+            for f in root.iterdir()
+            if f.is_file()
+        )
+        if has_root_files:
+            modules.append(ModuleConfig(name="core", path=".", depends_on=[]))
+
+    return modules
+
+
 def run_auto_scan(source_root: str | Path) -> GovernanceReport:
-    """Zero-config scan: discover modules from source, check for cycles and undeclared deps."""
-    from code_governance.schemas import RulesConfig
+    """Zero-config scan: discover modules at every directory level, check for cycles."""
+    from code_governance.schemas import Language, RulesConfig
 
     source_root = Path(source_root).resolve()
     if not source_root.exists():
         raise FileNotFoundError(f"Source root not found: {source_root}")
 
-    config = generate_config(source_root, "python")
-    config.root = "."
-    config.rules = RulesConfig(
-        no_cycles=True,
-        enforce_layers=False,
-        enforce_depends_on=False,
-        exclude_test_files=True,
+    modules = _discover_modules_recursive(source_root)
+
+    config = GovernanceConfig(
+        root=".",
+        language=Language.PYTHON,
+        modules=modules,
+        rules=RulesConfig(
+            no_cycles=True,
+            enforce_layers=False,
+            enforce_depends_on=False,
+            exclude_test_files=True,
+        ),
     )
 
     extractions = extract_directory(source_root, config.language, config.rules.exclude_test_files)

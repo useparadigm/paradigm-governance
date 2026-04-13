@@ -1,14 +1,15 @@
 [project]
 name = "code-governance"
-version = "0.3.0"
+version = "0.3.1"
 description = "AST-based governance engine for enforcing module boundaries and architecture rules in Python codebases"
 requires-python = ">=3.10"
 license = "MIT"
 readme = "README.md"
+authors = [{name = "Paradigm", email = "hello@useparadigm.app"}]
 dependencies = [
-    "pydantic>=2.0",
+    "pydantic>=2.0,<3",
     "ast-grep-py>=0.28.1",
-    "httpx>=0.25",
+    "httpx>=0.25,<1",
     "tomli>=2.0; python_version < '3.11'",
 ]
 classifiers = [

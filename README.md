@@ -157,6 +157,14 @@ governance-ast --baseline .governance-baseline.json
 
 Accept existing violations. Only fail on new ones.
 
+### Transitive detection
+
+```bash
+governance-ast --transitive
+```
+
+Detects indirect violations through dependency chains. If `api` has `cannot_depend_on = ["db"]` and `api → service → db`, the transitive check catches it. Also works with layer enforcement. Enable permanently in config with `transitive = true` under `[rules]`.
+
 ## LLM advice
 
 ```bash
@@ -191,16 +199,15 @@ Self-contained dependency matrix with module metrics. Drop any governance JSON i
 | **JSON output** | Yes | Yes | No |
 | **Scans source directly** | Yes | Yes | No — must be importable |
 | **Interface enforcement** | No | Yes | No |
-| **Transitive imports** | Direct only | Direct only | Full chain |
+| **Transitive imports** | Full chain (`--transitive`) | Direct only | Full chain |
 | **Forbidden imports** | `cannot_depend_on` | `cannot_depend_on` | Forbidden contract |
 | **Visibility control** | No | Yes | No |
 | **Speed (Django)** | ~1.2s | Sub-second (Rust) | ~0.1s (grimp) |
 | **Config syntax** | Simple TOML lists | TOML with regex | INI or TOML |
 | **Maintenance** | Active | Abandoned by original team | Active, slow |
 
-**Choose tach** if you need interface enforcement or visibility control.
-**Choose import-linter** if you need transitive import detection.
-**Choose code-governance** if you want AI-guided setup, CI integration, or zero-config scanning.
+**Choose tach** if you need interface enforcement or visibility control (note: unmaintained).
+**Choose code-governance** if you want transitive detection, AI-guided setup, CI integration, or zero-config scanning.
 
 ---
 

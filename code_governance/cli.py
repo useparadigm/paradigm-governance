@@ -55,7 +55,12 @@ def main():
     parser.add_argument(
         "--generate",
         action="store_true",
-        help="Generate governance.toml with modules and real dependencies from source (ground truth, no enforcement)",
+        help="Generate governance.toml with cannot_depend_on seeded by locking down current non-dependencies",
+    )
+    parser.add_argument(
+        "--fix-deps",
+        action="store_true",
+        help="Re-seed cannot_depend_on in an existing governance.toml based on current imports",
     )
     parser.add_argument(
         "--source-root",
@@ -102,6 +107,10 @@ def main():
 
     if args.generate:
         _handle_generate(args)
+        return
+
+    if args.fix_deps:
+        _handle_fix_deps(args)
         return
 
     if args.discover:
@@ -151,7 +160,7 @@ def _handle_fix_config(args):
         print(f"Config file already exists: {out_path}", file=sys.stderr)
         sys.exit(1)
 
-    config = generate_full_config(args.source_root, args.language, args.config)
+    config = generate_full_config(args.source_root, args.language, args.config, seed=False)
     toml_str = config_to_toml(config)
     out_path.write_text(toml_str)
     print(f"Generated {out_path} with {len(config.modules)} modules")
@@ -163,11 +172,27 @@ def _handle_generate(args):
         print(f"Config file already exists: {out_path}", file=sys.stderr)
         sys.exit(1)
 
-    config = generate_full_config(args.source_root, args.language, args.config)
+    config = generate_full_config(args.source_root, args.language, args.config, seed=True)
     toml_str = config_to_toml(config)
     out_path.write_text(toml_str)
 
-    print(f"Generated {out_path} with {len(config.modules)} modules")
+    forbidden_total = sum(len(m.cannot_depend_on) for m in config.modules)
+    print(f"Generated {out_path} with {len(config.modules)} modules, {forbidden_total} forbidden edges seeded")
+
+
+def _handle_fix_deps(args):
+    from code_governance.engine import populate_cannot_depend_on
+
+    config_path = Path(args.config)
+    if not config_path.exists():
+        print(f"Config not found: {config_path}", file=sys.stderr)
+        sys.exit(1)
+
+    config = populate_cannot_depend_on(config_path)
+    config_path.write_text(config_to_toml(config))
+
+    forbidden_total = sum(len(m.cannot_depend_on) for m in config.modules)
+    print(f"Updated {config_path} — {len(config.modules)} modules, {forbidden_total} forbidden edges")
 
 
 def _handle_discover(args):

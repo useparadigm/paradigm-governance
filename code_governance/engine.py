@@ -256,6 +256,8 @@ def generate_full_config(
     source_root: str | Path,
     language: str = "python",
     config_path: str | Path = "governance.toml",
+    *,
+    seed: bool = True,
 ) -> GovernanceConfig:
     source_root = Path(source_root).resolve()
     config = generate_config(source_root, language)
@@ -268,7 +270,36 @@ def generate_full_config(
         rel_root = source_root
     config.root = str(rel_root)
 
+    if seed:
+        _seed_cannot_depend_on(config, source_root)
     return config
+
+
+def _seed_cannot_depend_on(config: GovernanceConfig, source_root: Path) -> GovernanceConfig:
+    """Lock down the current state: for each module, forbid every other module it
+    does not currently import. New imports that weren't observed at config
+    generation time will surface as violations."""
+    extractions = extract_directory(source_root, config.language, config.rules.exclude_test_files)
+    graph = build_dependency_graph(extractions, config)
+
+    module_names = {mod.name for mod in config.modules}
+    for mod in config.modules:
+        observed = set(graph.module_edges.get(mod.name, {}).keys()) & module_names
+        mod.cannot_depend_on = sorted(module_names - observed - {mod.name})
+    return config
+
+
+def populate_cannot_depend_on(config_path: str | Path) -> GovernanceConfig:
+    """Re-seed cannot_depend_on on an existing config — used by --fix-deps after
+    new modules or imports appear."""
+    config_path = Path(config_path)
+    config = load_config(config_path)
+    source_root = config_path.parent / config.root
+
+    if not source_root.exists():
+        raise FileNotFoundError(f"Source root not found: {source_root}")
+
+    return _seed_cannot_depend_on(config, source_root)
 
 
 def _discover_modules_recursive(root: Path) -> list:

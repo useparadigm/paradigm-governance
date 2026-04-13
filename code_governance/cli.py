@@ -146,14 +146,13 @@ def _handle_html_output(args):
 
 
 def _handle_fix_config(args):
-    config = generate_config(args.source_root, args.language)
-    toml_str = config_to_toml(config)
-
     out_path = Path(args.config)
     if out_path.exists():
         print(f"Config file already exists: {out_path}", file=sys.stderr)
         sys.exit(1)
 
+    config = generate_full_config(args.source_root, args.language, args.config)
+    toml_str = config_to_toml(config)
     out_path.write_text(toml_str)
     print(f"Generated {out_path} with {len(config.modules)} modules")
 

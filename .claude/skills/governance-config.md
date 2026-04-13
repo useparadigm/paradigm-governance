@@ -12,8 +12,10 @@ governance-ast --generate --source-root <path-to-source> --config governance.tom
 
 This creates a `governance.toml` with:
 - All top-level directories as modules
-- Empty `cannot_depend_on` (no restrictions by default)
+- `cannot_depend_on` seeded by inverting observed imports: each module forbids every other module it does not currently import. Future imports that weren't present at generation time surface as violations.
 - Default enforcement rules
+
+If you want a bare skeleton (empty `cannot_depend_on`) use `--fix-config` instead. Re-seed an existing config after adding modules or imports with `governance-ast --fix-deps`.
 
 ## Step 2: Read and analyze the generated config
 

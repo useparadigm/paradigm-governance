@@ -81,7 +81,8 @@ FAILED
 **Full setup** — generate config, review, enforce:
 
 ```bash
-# Generate config from source — detects modules, maps real imports
+# Generate config: detect modules + seed cannot_depend_on by locking down
+# every module pair that does not currently import from each other.
 governance-ast --generate --source-root src/
 
 # See the dependency map

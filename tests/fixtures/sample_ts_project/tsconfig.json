@@ -1,0 +1,9 @@
+{
+  // TS config with path alias for governance test fixture
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+    },
+  },
+}

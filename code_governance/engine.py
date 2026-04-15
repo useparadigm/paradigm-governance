@@ -206,7 +206,48 @@ def config_to_toml(config: GovernanceConfig) -> str:
 _SKIP_DIRS = {"node_modules", "__pycache__", ".git", "venv", ".venv"}
 _LANG_EXTENSIONS = {
     "python": {".py"},
+    "typescript": {".ts", ".tsx", ".js", ".jsx", ".mts", ".cts", ".mjs", ".cjs"},
 }
+
+
+_MIXED_WARN_RATIO = 0.2
+
+
+def detect_language(source_root: str | Path, *, warn_mixed: bool = True) -> "Language":
+    import sys as _sys
+    from code_governance.schemas import Language
+
+    root = Path(source_root)
+    counts: dict[str, int] = {lang: 0 for lang in _LANG_EXTENSIONS}
+    ext_to_lang: dict[str, str] = {}
+    for lang, exts in _LANG_EXTENSIONS.items():
+        for ext in exts:
+            ext_to_lang[ext] = lang
+
+    for path in root.rglob("*"):
+        if not path.is_file():
+            continue
+        if any(part in _SKIP_DIRS for part in path.parts):
+            continue
+        lang = ext_to_lang.get(path.suffix)
+        if lang:
+            counts[lang] += 1
+
+    best = max(counts, key=lambda k: (counts[k], -list(_LANG_EXTENSIONS).index(k)))
+    if counts[best] == 0:
+        return Language.PYTHON
+
+    if warn_mixed:
+        others = [(lang, n) for lang, n in counts.items() if lang != best and n > 0]
+        for lang, n in others:
+            if n >= _MIXED_WARN_RATIO * counts[best]:
+                print(
+                    f"Warning: mixed project detected — using '{best}' "
+                    f"({counts[best]} files) but also found {n} {lang} files. "
+                    f"Run a separate governance.toml for {lang} to cover them.",
+                    file=_sys.stderr,
+                )
+    return Language(best)
 
 
 def generate_config(
@@ -307,19 +348,19 @@ def populate_cannot_depend_on(config_path: str | Path) -> GovernanceConfig:
     return _seed_cannot_depend_on(config, source_root)
 
 
-def _discover_modules_recursive(root: Path) -> list:
-    """Recursively discover all directories containing .py files."""
+def _discover_modules_recursive(root: Path, extensions: set[str]) -> list:
+    """Recursively discover all directories containing source files of the given language."""
     from code_governance.schemas import ModuleConfig
 
     modules = []
 
     def _walk(directory: Path, prefix: str):
-        has_py = any(
-            f.suffix == ".py" and not f.name.startswith("_")
+        has_src = any(
+            f.suffix in extensions and not f.name.startswith("_")
             for f in directory.iterdir()
             if f.is_file()
         )
-        if has_py and prefix:
+        if has_src and prefix:
             modules.append(ModuleConfig(
                 name=prefix.replace("/", ".").rstrip("."),
                 path=prefix,
@@ -337,10 +378,9 @@ def _discover_modules_recursive(root: Path) -> list:
 
     _walk(root, "")
 
-    # If only root-level .py files exist (no subdirs with code), add a "core" module
     if not modules:
         has_root_files = any(
-            f.suffix == ".py" and not f.name.startswith("_")
+            f.suffix in extensions and not f.name.startswith("_")
             for f in root.iterdir()
             if f.is_file()
         )
@@ -352,17 +392,19 @@ def _discover_modules_recursive(root: Path) -> list:
 
 def run_auto_scan(source_root: str | Path) -> GovernanceReport:
     """Zero-config scan: discover modules at every directory level, check for cycles."""
-    from code_governance.schemas import Language, RulesConfig
+    from code_governance.schemas import RulesConfig
 
     source_root = Path(source_root).resolve()
     if not source_root.exists():
         raise FileNotFoundError(f"Source root not found: {source_root}")
 
-    modules = _discover_modules_recursive(source_root)
+    language = detect_language(source_root)
+    extensions = _LANG_EXTENSIONS[language.value]
+    modules = _discover_modules_recursive(source_root, extensions)
 
     config = GovernanceConfig(
         root=".",
-        language=Language.PYTHON,
+        language=language,
         modules=modules,
         rules=RulesConfig(
             no_cycles=True,

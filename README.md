@@ -4,7 +4,7 @@
 
 <h1 align="center">code-governance</h1>
 
-<p align="center"><b>Stop spaghetti imports. Enforce module boundaries in Python.</b></p>
+<p align="center"><b>Stop spaghetti imports. Enforce module boundaries in Python and TypeScript.</b></p>
 
 <p align="center">
   <a href="https://pypi.org/project/code-governance/"><img src="https://img.shields.io/pypi/v/code-governance?style=flat&color=orange" alt="PyPI"></a>
@@ -77,6 +77,18 @@ Violations (1):
 
 FAILED
 ```
+
+Works on TypeScript too — language auto-detected from source:
+
+```bash
+$ governance-ast --auto src/
+
+Governance Report (typescript)
+Modules: 6 | Files scanned: 82
+...
+```
+
+`.ts`, `.tsx`, `.js`, `.jsx`, `.mts`, `.cts`, `.mjs`, `.cjs` all supported. `tsconfig.json` path aliases (`@/*`, `extends` chains) are honored.
 
 **Full setup** — generate config, review, enforce:
 

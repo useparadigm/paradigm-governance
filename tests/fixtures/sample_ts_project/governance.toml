@@ -1,0 +1,36 @@
+[governance]
+root = "."
+language = "typescript"
+
+[[modules]]
+name = "core"
+path = "src/core/"
+cannot_depend_on = ["db"]
+layer = "core"
+
+[[modules]]
+name = "db"
+path = "src/db/"
+cannot_depend_on = []
+layer = "db"
+
+[[modules]]
+name = "api"
+path = "src/api/"
+cannot_depend_on = []
+layer = "api"
+
+[[modules]]
+name = "utils"
+path = "src/utils/"
+cannot_depend_on = []
+layer = "utils"
+
+[layers]
+order = ["api", "db", "core", "utils"]
+
+[rules]
+no_cycles = true
+enforce_layers = true
+enforce_cannot_depend_on = true
+exclude_test_files = true

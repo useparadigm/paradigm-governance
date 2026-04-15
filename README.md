@@ -243,9 +243,8 @@ Self-contained dependency matrix with module metrics. Drop any governance JSON i
 | **Visibility control** | No | Yes | No |
 | **Speed (Django)** | ~1.2s | Sub-second (Rust) | ~0.1s (grimp) |
 | **Config syntax** | Simple TOML lists | TOML with regex | INI or TOML |
-| **Maintenance** | Active | Abandoned by original team | Active, slow |
 
-**Choose tach** if you need interface enforcement or visibility control (note: unmaintained).
+**Choose tach** if you need interface enforcement or visibility control.
 **Choose code-governance** if you want transitive detection, AI-guided setup, CI integration, or zero-config scanning.
 
 ---

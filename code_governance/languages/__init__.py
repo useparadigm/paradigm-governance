@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Optional, Protocol, runtime_checkable
 from ast_grep_py import SgNode
 
 from code_governance.languages.python import PythonPatterns
+from code_governance.languages.typescript import TypeScriptPatterns
 from code_governance.schemas import FileExtractionResult, Language
 
 if TYPE_CHECKING:
@@ -36,6 +37,7 @@ class LanguagePatterns(Protocol):
 
 LANGUAGE_PATTERNS: dict[Language, type] = {
     Language.PYTHON: PythonPatterns,
+    Language.TYPESCRIPT: TypeScriptPatterns,
 }
 
 

@@ -69,9 +69,9 @@ def main():
     )
     parser.add_argument(
         "--language",
-        default="python",
-        choices=["python"],
-        help="Language for --fix-config / --generate (default: python)",
+        default="auto",
+        choices=["auto", "python", "typescript"],
+        help="Language for --fix-config / --generate (default: auto — detect from source)",
     )
     parser.add_argument(
         "--advise",
@@ -154,16 +154,24 @@ def _handle_html_output(args):
     print(html)
 
 
+def _resolve_language(arg_language: str, source_root: str) -> str:
+    if arg_language != "auto":
+        return arg_language
+    from code_governance.engine import detect_language
+    return detect_language(source_root).value
+
+
 def _handle_fix_config(args):
     out_path = Path(args.config)
     if out_path.exists():
         print(f"Config file already exists: {out_path}", file=sys.stderr)
         sys.exit(1)
 
-    config = generate_full_config(args.source_root, args.language, args.config, seed=False)
+    language = _resolve_language(args.language, args.source_root)
+    config = generate_full_config(args.source_root, language, args.config, seed=False)
     toml_str = config_to_toml(config)
     out_path.write_text(toml_str)
-    print(f"Generated {out_path} with {len(config.modules)} modules")
+    print(f"Generated {out_path} with {len(config.modules)} modules ({language})")
 
 
 def _handle_generate(args):
@@ -172,12 +180,13 @@ def _handle_generate(args):
         print(f"Config file already exists: {out_path}", file=sys.stderr)
         sys.exit(1)
 
-    config = generate_full_config(args.source_root, args.language, args.config, seed=True)
+    language = _resolve_language(args.language, args.source_root)
+    config = generate_full_config(args.source_root, language, args.config, seed=True)
     toml_str = config_to_toml(config)
     out_path.write_text(toml_str)
 
     forbidden_total = sum(len(m.cannot_depend_on) for m in config.modules)
-    print(f"Generated {out_path} with {len(config.modules)} modules, {forbidden_total} forbidden edges seeded")
+    print(f"Generated {out_path} with {len(config.modules)} modules ({language}), {forbidden_total} forbidden edges seeded")
 
 
 def _handle_fix_deps(args):

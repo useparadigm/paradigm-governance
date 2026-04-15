@@ -5,6 +5,7 @@ from pathlib import Path
 from code_governance.config import load_config
 from code_governance.dep_graph import build_dependency_graph
 from code_governance.extractor import extract_directory
+from code_governance.languages import get_patterns
 from code_governance.rules import ALL_RULES, compute_module_metrics
 from code_governance.schemas import (
     DependencyTarget,
@@ -25,9 +26,10 @@ def run_governance(config_path: str | Path, *, config: GovernanceConfig | None =
     if not source_root.exists():
         raise FileNotFoundError(f"Source root not found: {source_root}")
 
-    extractions = extract_directory(source_root, config.language, config.rules.exclude_test_files)
+    patterns = get_patterns(config.language, repo_root=repo_root, config=config)
+    extractions = extract_directory(source_root, config.language, config.rules.exclude_test_files, patterns=patterns)
 
-    graph = build_dependency_graph(extractions, config)
+    graph = build_dependency_graph(extractions, config, patterns=patterns)
 
     violations: list[Violation] = []
     for rule_fn in ALL_RULES:
@@ -72,11 +74,12 @@ def run_governance_diff(config_path: str | Path, git_ref: str = "HEAD", *, confi
             rel = line[len(root_prefix):]
             changed_files.add(rel)
 
-    all_extractions = extract_directory(source_root, config.language, config.rules.exclude_test_files)
+    patterns = get_patterns(config.language, repo_root=repo_root, config=config)
+    all_extractions = extract_directory(source_root, config.language, config.rules.exclude_test_files, patterns=patterns)
 
     changed_extractions = [e for e in all_extractions if e.file_path in changed_files]
 
-    graph = build_dependency_graph(all_extractions, config)
+    graph = build_dependency_graph(all_extractions, config, patterns=patterns)
 
     violations: list[Violation] = []
     for rule_fn in ALL_RULES:
@@ -124,8 +127,9 @@ def discover_dependencies(config_path: str | Path) -> DiscoverReport:
     if not source_root.exists():
         raise FileNotFoundError(f"Source root not found: {source_root}")
 
-    extractions = extract_directory(source_root, config.language, config.rules.exclude_test_files)
-    graph = build_dependency_graph(extractions, config)
+    patterns = get_patterns(config.language, repo_root=repo_root, config=config)
+    extractions = extract_directory(source_root, config.language, config.rules.exclude_test_files, patterns=patterns)
+    graph = build_dependency_graph(extractions, config, patterns=patterns)
     metrics = compute_module_metrics(graph, config)
 
     grouped: dict[str, dict[str, list[dict]]] = defaultdict(lambda: defaultdict(list))
@@ -279,8 +283,9 @@ def _seed_cannot_depend_on(config: GovernanceConfig, source_root: Path) -> Gover
     """Lock down the current state: for each module, forbid every other module it
     does not currently import. New imports that weren't observed at config
     generation time will surface as violations."""
-    extractions = extract_directory(source_root, config.language, config.rules.exclude_test_files)
-    graph = build_dependency_graph(extractions, config)
+    patterns = get_patterns(config.language, repo_root=source_root, config=config)
+    extractions = extract_directory(source_root, config.language, config.rules.exclude_test_files, patterns=patterns)
+    graph = build_dependency_graph(extractions, config, patterns=patterns)
 
     module_names = {mod.name for mod in config.modules}
     for mod in config.modules:
@@ -367,8 +372,9 @@ def run_auto_scan(source_root: str | Path) -> GovernanceReport:
         ),
     )
 
-    extractions = extract_directory(source_root, config.language, config.rules.exclude_test_files)
-    graph = build_dependency_graph(extractions, config)
+    patterns = get_patterns(config.language, repo_root=source_root, config=config)
+    extractions = extract_directory(source_root, config.language, config.rules.exclude_test_files, patterns=patterns)
+    graph = build_dependency_graph(extractions, config, patterns=patterns)
 
     violations: list[Violation] = []
     for rule_fn in ALL_RULES:

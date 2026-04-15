@@ -26,11 +26,18 @@
 
 ### Option 1: With Claude Code (recommended)
 
-Install the plugin — Claude handles everything interactively:
+Install the plugin — Claude handles everything interactively. **Run each command separately** — pasting them all at once will concatenate into a single broken URL:
 
 ```
 /plugin marketplace add useparadigm/code-governance-plugin
+```
+
+```
 /plugin install code-governance
+```
+
+```
+/reload-plugins
 ```
 
 Then run:
@@ -38,6 +45,8 @@ Then run:
 ```
 /governance-init
 ```
+
+> Without `/reload-plugins`, the new commands won't be registered yet and `/governance-init` will fail with `Unknown command`.
 
 **What happens:**
 

@@ -373,6 +373,30 @@ governance:
 
 </details>
 
+## Updating
+
+There are two pieces to update independently:
+
+**CLI (PyPI package):**
+
+```bash
+pip install --upgrade code-governance
+```
+
+Check the installed version against the flags — if you don't see `--language {auto,python,typescript}` in `governance-ast --help`, you're on a pre-0.4 CLI and the TypeScript feature won't work.
+
+**Claude Code plugin (skills):**
+
+```
+/plugin marketplace update useparadigm-code-governance-plugin
+```
+
+```
+/reload-plugins
+```
+
+Or enable auto-update once: `/plugin` → **Marketplaces** → toggle *Enable auto-update*. Then every session picks up the latest skills automatically.
+
 ## License
 
 MIT

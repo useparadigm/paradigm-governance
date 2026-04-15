@@ -1,13 +1,27 @@
 from __future__ import annotations
 
+from pathlib import Path, PurePosixPath
+from typing import TYPE_CHECKING, Optional
+
 from ast_grep_py import SgNode
 
 from code_governance.schemas import ClassInfo, FileExtractionResult, ImportInfo
+
+if TYPE_CHECKING:
+    from code_governance.schemas import GovernanceConfig
 
 
 class PythonPatterns:
     language = "python"
     extensions = (".py",)
+    test_file_patterns: list[tuple[str, str]] = [
+        ("test_", ""),
+        ("", "_test.py"),
+        ("conftest.py", ""),
+    ]
+
+    def initialize(self, repo_root: Path, config: "GovernanceConfig") -> None:
+        pass
 
     def extract(self, root: SgNode, file_path: str) -> FileExtractionResult:
         imports = self._extract_imports(root)
@@ -19,6 +33,47 @@ class PythonPatterns:
             classes=classes,
             symbols=symbols,
         )
+
+    def file_to_importable(self, file_path: str) -> Optional[str]:
+        p = PurePosixPath(file_path)
+        if p.suffix == ".py":
+            return str(p.with_suffix("")).replace("/", ".")
+        return None
+
+    def resolve_import(
+        self,
+        import_source: str,
+        importing_file: str,
+        config: "GovernanceConfig",
+        importable_map: dict[str, str],
+        module_files: dict[str, str],
+    ) -> Optional[str]:
+        if import_source.startswith("."):
+            resolved = _resolve_relative_import(import_source, importing_file)
+            if resolved:
+                import_source = resolved
+
+        candidates = [import_source]
+        root_pkg = config.root.rstrip("/").replace("/", ".")
+        if import_source.startswith(root_pkg + "."):
+            candidates.append(import_source[len(root_pkg) + 1:])
+        if config.package_prefix and import_source.startswith(config.package_prefix + "."):
+            candidates.append(import_source[len(config.package_prefix) + 1:])
+
+        for candidate in candidates:
+            if candidate in importable_map:
+                return importable_map[candidate]
+
+            for dotted, mod_name in importable_map.items():
+                if dotted.startswith(candidate + ".") or candidate.startswith(dotted + "."):
+                    return mod_name
+
+            for mod in config.modules:
+                mod_prefix = mod.path.rstrip("/").replace("/", ".")
+                if candidate == mod_prefix or candidate.startswith(mod_prefix + "."):
+                    return mod.name
+
+        return None
 
     def _extract_imports(self, root: SgNode) -> list[ImportInfo]:
         results: list[ImportInfo] = []
@@ -81,3 +136,23 @@ class PythonPatterns:
             if name:
                 symbols.append(name.text())
         return symbols
+
+
+def _resolve_relative_import(import_source: str, importing_file: str) -> Optional[str]:
+    dots = 0
+    for ch in import_source:
+        if ch == ".":
+            dots += 1
+        else:
+            break
+
+    remainder = import_source[dots:]
+    parts = PurePosixPath(importing_file).parts[:-1]
+
+    if dots > len(parts):
+        return None
+
+    base_parts = parts[: len(parts) - (dots - 1)]
+    if remainder:
+        return ".".join(base_parts) + "." + remainder
+    return ".".join(base_parts)

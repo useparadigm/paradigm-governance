@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING, Optional
 
 from ast_grep_py import SgRoot
 
 from code_governance.languages import get_patterns
 from code_governance.schemas import FileExtractionResult, Language
+
+if TYPE_CHECKING:
+    from code_governance.languages import LanguagePatterns
 
 
 def extract_file(file_path: str, source: str, language: Language) -> FileExtractionResult:
@@ -19,8 +23,10 @@ def extract_directory(
     root_dir: str | Path,
     language: Language,
     exclude_test_files: bool = True,
+    patterns: Optional["LanguagePatterns"] = None,
 ) -> list[FileExtractionResult]:
-    patterns = get_patterns(language)
+    if patterns is None:
+        patterns = get_patterns(language)
     root_path = Path(root_dir)
     results: list[FileExtractionResult] = []
 
@@ -29,11 +35,12 @@ def extract_directory(
             if _should_skip(file_path):
                 continue
             rel_path = str(file_path.relative_to(root_path))
-            if exclude_test_files and _is_test_file(rel_path, language):
+            if exclude_test_files and _is_test_file(rel_path, patterns):
                 continue
             try:
                 source = file_path.read_text(encoding="utf-8", errors="replace")
-                result = extract_file(rel_path, source, language)
+                sg_root = SgRoot(source, patterns.language)
+                result = patterns.extract(sg_root.root(), rel_path)
                 results.append(result)
             except Exception as e:
                 print(f"Warning: failed to parse {file_path}: {e}", file=sys.stderr)
@@ -44,17 +51,13 @@ def extract_directory(
 
 _TEST_DIR_SEGMENTS = {"tests", "test", "__tests__"}
 
-_TEST_FILE_PATTERNS: dict[Language, list[tuple[str, str]]] = {
-    Language.PYTHON: [("test_", ""), ("", "_test.py"), ("conftest.py", "")],
-}
 
-
-def _is_test_file(rel_path: str, language: Language) -> bool:
+def _is_test_file(rel_path: str, patterns: "LanguagePatterns") -> bool:
     parts = rel_path.replace("\\", "/").split("/")
     if any(p in _TEST_DIR_SEGMENTS for p in parts[:-1]):
         return True
     filename = parts[-1]
-    for prefix, suffix in _TEST_FILE_PATTERNS.get(language, []):
+    for prefix, suffix in patterns.test_file_patterns:
         if prefix and filename.startswith(prefix):
             return True
         if suffix and filename.endswith(suffix):

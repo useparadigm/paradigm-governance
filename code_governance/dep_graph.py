@@ -2,14 +2,17 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field
-from pathlib import PurePosixPath
+from typing import TYPE_CHECKING, Optional
 
+from code_governance.languages import get_patterns
 from code_governance.schemas import (
     EdgeDetail,
     FileExtractionResult,
     GovernanceConfig,
-    ModuleConfig,
 )
+
+if TYPE_CHECKING:
+    from code_governance.languages import LanguagePatterns
 
 
 @dataclass
@@ -67,11 +70,14 @@ class DependencyGraph:
 def build_dependency_graph(
     extractions: list[FileExtractionResult],
     config: GovernanceConfig,
+    patterns: Optional["LanguagePatterns"] = None,
 ) -> DependencyGraph:
+    if patterns is None:
+        patterns = get_patterns(config.language)
     graph = DependencyGraph()
     file_to_module = _build_file_to_module_map(extractions, config)
     module_files = _build_module_files_map(config)
-    importable_map = _build_importable_map(extractions, config)
+    importable_map = _build_importable_map(extractions, config, patterns)
 
     for ext in extractions:
         src_module = file_to_module.get(ext.file_path)
@@ -82,7 +88,7 @@ def build_dependency_graph(
             graph.symbols_per_module[src_module].add(sym)
 
         for imp in ext.imports:
-            target_module = _resolve_import_to_module(
+            target_module = patterns.resolve_import(
                 imp.source_module, ext.file_path, config, importable_map, module_files
             )
             if not target_module:
@@ -140,6 +146,7 @@ def _build_module_files_map(config: GovernanceConfig) -> dict[str, str]:
 def _build_importable_map(
     extractions: list[FileExtractionResult],
     config: GovernanceConfig,
+    patterns: "LanguagePatterns",
 ) -> dict[str, str]:
     mapping: dict[str, str] = {}
     sorted_mods = sorted(config.modules, key=lambda m: (m.path == ".", m.path), reverse=False)
@@ -158,81 +165,9 @@ def _build_importable_map(
             matched_mod = catch_all
 
         if matched_mod:
-            dotted = _file_to_dotted(ext.file_path, config)
-            if dotted:
-                mapping[dotted] = matched_mod.name
+            importable = patterns.file_to_importable(ext.file_path)
+            if importable:
+                mapping[importable] = matched_mod.name
     return mapping
-
-
-def _file_to_dotted(file_path: str, config: GovernanceConfig) -> str | None:
-    p = PurePosixPath(file_path)
-    if p.suffix == ".py":
-        return str(p.with_suffix("")).replace("/", ".")
-    return None
-
-
-def _resolve_import_to_module(
-    import_source: str,
-    importing_file: str,
-    config: GovernanceConfig,
-    importable_map: dict[str, str],
-    module_files: dict[str, str],
-) -> str | None:
-    return _resolve_python_import(import_source, importing_file, config, importable_map, module_files)
-
-
-def _resolve_python_import(
-    import_source: str,
-    importing_file: str,
-    config: GovernanceConfig,
-    importable_map: dict[str, str],
-    module_files: dict[str, str],
-) -> str | None:
-    if import_source.startswith("."):
-        resolved = _resolve_relative_import(import_source, importing_file)
-        if resolved:
-            import_source = resolved
-
-    candidates = [import_source]
-    root_pkg = config.root.rstrip("/").replace("/", ".")
-    if import_source.startswith(root_pkg + "."):
-        candidates.append(import_source[len(root_pkg) + 1:])
-    if config.package_prefix and import_source.startswith(config.package_prefix + "."):
-        candidates.append(import_source[len(config.package_prefix) + 1:])
-
-    for candidate in candidates:
-        if candidate in importable_map:
-            return importable_map[candidate]
-
-        for dotted, mod_name in importable_map.items():
-            if dotted.startswith(candidate + ".") or candidate.startswith(dotted + "."):
-                return mod_name
-
-        for mod in config.modules:
-            mod_prefix = mod.path.rstrip("/").replace("/", ".")
-            if candidate == mod_prefix or candidate.startswith(mod_prefix + "."):
-                return mod.name
-
-    return None
-
-
-def _resolve_relative_import(import_source: str, importing_file: str) -> str | None:
-    dots = 0
-    for ch in import_source:
-        if ch == ".":
-            dots += 1
-        else:
-            break
-
-    remainder = import_source[dots:]
-    parts = PurePosixPath(importing_file).parts[:-1]
-
-    if dots > len(parts):
-        return None
-
-    base_parts = parts[: len(parts) - (dots - 1)]
-    if remainder:
-        return ".".join(base_parts) + "." + remainder
-    return ".".join(base_parts)
 
 

@@ -106,6 +106,23 @@ governance-ast
 
 See [governance-fix workflow](#governance-fix-workflow) to enable the `/governance fix` PR command.
 
+**GitLab CI** — add to `.gitlab-ci.yml`:
+
+```yaml
+governance:
+  image: python:3.12-slim
+  variables:
+    GIT_DEPTH: 0
+  before_script:
+    - pip install code-governance
+  script:
+    - governance-ast --config governance.toml --diff origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+```
+
+See [GitLab MR comments](#gitlab-mr-comments) to post the report as an MR note.
+
 ## What it catches
 
 | Rule | Example |
@@ -291,6 +308,47 @@ jobs:
           gh pr comment ${{ github.event.issue.number }} \
             --body "✅ Config fix applied in \`${{ steps.fix.outputs.sha }}\`. Re-run checks to verify."
 ```
+
+</details>
+
+<details>
+<summary><h3>GitLab MR comments</h3></summary>
+
+Posts the governance report as a note on the merge request. Requires a Project Access Token with `api` scope, exposed as masked CI variable `GOVERNANCE_GITLAB_TOKEN`.
+
+```yaml
+governance:
+  image: python:3.12-slim
+  variables:
+    GIT_DEPTH: 0
+  before_script:
+    - pip install code-governance
+    - apt-get update && apt-get install -y --no-install-recommends curl jq && rm -rf /var/lib/apt/lists/*
+  script:
+    - set +e
+    - governance-ci-report --config governance.toml --json > report.json
+    - set -e
+    - PASSED=$(jq -r '.passed' report.json)
+    - jq -r '.markdown' report.json | tee report.md
+    - |
+      if [ "$CI_PIPELINE_SOURCE" = "merge_request_event" ] && [ -n "$GOVERNANCE_GITLAB_TOKEN" ]; then
+        BODY=$(jq -Rs . < report.md)
+        curl -sf --request POST \
+          --header "PRIVATE-TOKEN: $GOVERNANCE_GITLAB_TOKEN" \
+          --header "Content-Type: application/json" \
+          --data "{\"body\": $BODY}" \
+          "$CI_API_V4_URL/projects/$CI_PROJECT_ID/merge_requests/$CI_MERGE_REQUEST_IID/notes"
+      fi
+    - test "$PASSED" = "true"
+  artifacts:
+    when: always
+    paths: [report.json, report.md]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+```
+
+`/governance fix` is GitHub-only for now — GitLab equivalent would need a Note webhook listener.
 
 </details>
 

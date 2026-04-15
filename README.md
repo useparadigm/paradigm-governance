@@ -26,11 +26,17 @@
 
 ### Option 1: With Claude Code (recommended)
 
-Install the plugin — Claude handles everything interactively:
+Install the plugin — Claude handles everything interactively. **Run each command separately** — pasting them all at once will concatenate into a single broken URL:
 
 ```
 /plugin marketplace add useparadigm/code-governance-plugin
+```
+
+```
 /plugin install code-governance
+```
+
+```
 /reload-plugins
 ```
 

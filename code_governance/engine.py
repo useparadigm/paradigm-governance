@@ -210,7 +210,11 @@ _LANG_EXTENSIONS = {
 }
 
 
-def detect_language(source_root: str | Path) -> "Language":
+_MIXED_WARN_RATIO = 0.2
+
+
+def detect_language(source_root: str | Path, *, warn_mixed: bool = True) -> "Language":
+    import sys as _sys
     from code_governance.schemas import Language
 
     root = Path(source_root)
@@ -232,6 +236,17 @@ def detect_language(source_root: str | Path) -> "Language":
     best = max(counts, key=lambda k: (counts[k], -list(_LANG_EXTENSIONS).index(k)))
     if counts[best] == 0:
         return Language.PYTHON
+
+    if warn_mixed:
+        others = [(lang, n) for lang, n in counts.items() if lang != best and n > 0]
+        for lang, n in others:
+            if n >= _MIXED_WARN_RATIO * counts[best]:
+                print(
+                    f"Warning: mixed project detected — using '{best}' "
+                    f"({counts[best]} files) but also found {n} {lang} files. "
+                    f"Run a separate governance.toml for {lang} to cover them.",
+                    file=_sys.stderr,
+                )
     return Language(best)
 
 

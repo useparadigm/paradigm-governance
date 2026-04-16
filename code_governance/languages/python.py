@@ -60,15 +60,27 @@ class PythonPatterns:
         if config.package_prefix and import_source.startswith(config.package_prefix + "."):
             candidates.append(import_source[len(config.package_prefix) + 1:])
 
+        sorted_mods = sorted(
+            config.modules,
+            key=lambda m: len(m.path.rstrip("/").split("/")) if m.path not in (".", "./") else 0,
+            reverse=True,
+        )
+
         for candidate in candidates:
             if candidate in importable_map:
                 return importable_map[candidate]
 
+            best_match: Optional[str] = None
+            best_len = -1
             for dotted, mod_name in importable_map.items():
                 if dotted.startswith(candidate + ".") or candidate.startswith(dotted + "."):
-                    return mod_name
+                    if len(dotted) > best_len:
+                        best_len = len(dotted)
+                        best_match = mod_name
+            if best_match:
+                return best_match
 
-            for mod in config.modules:
+            for mod in sorted_mods:
                 mod_prefix = mod.path.rstrip("/").replace("/", ".")
                 if candidate == mod_prefix or candidate.startswith(mod_prefix + "."):
                     return mod.name

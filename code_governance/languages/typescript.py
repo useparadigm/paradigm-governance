@@ -31,7 +31,7 @@ class TypeScriptPatterns:
 
     def initialize(self, repo_root: Path, config: "GovernanceConfig") -> None:
         self._repo_root = Path(repo_root).resolve()
-        self._tsconfig = load_tsconfig(self._repo_root)
+        self._tsconfig = load_tsconfig(self._repo_root, ["tsconfig.json", "tsconfig.base.json"])
 
     def extract(self, root: SgNode, file_path: str) -> FileExtractionResult:
         imports = self._extract_imports(root)
